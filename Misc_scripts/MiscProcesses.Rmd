@@ -1,0 +1,99 @@
+---
+title: "MiscProcesses"
+---
+
+A few small, but useful snippets of code.
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Init
+
+```{r init}
+
+library(sf)
+library(readxl) 
+library(ggplot2)
+
+
+home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/"
+
+dataFolder <- paste0(home, "Data2ndPass/")
+
+tableSourceFolder <- "GisReadyTables/"
+boundarySourceFolder <- "RelevantBoundaries/"
+outFolder <- "DisplayReadyData/"
+
+```
+
+
+
+## Add neutral IDs to the TADlevel_10counties shp
+
+```{r neutralIds2}
+
+layerName <- "TADlevel_10counties"
+
+shpToRead <- paste(dataFolder, boundarySourceFolder, layerName, ".shp", sep="")
+
+shpToRead
+
+geoLayer = st_read(shpToRead)
+
+geoLayer$neutral_id <- gsub('^C1', 'C0', geoLayer$ctpp_id)
+
+# Keep only the columns of relevance
+geoLayer <- geoLayer[c("neutral_id", "geometry")]
+
+geoLayer
+
+shpToWrite <- paste(dataFolder, boundarySourceFolder, layerName, ".shp", sep="")
+shpToWrite
+
+st_write(geoLayer, shpToWrite, delete_layer=TRUE)
+```
+
+
+
+
+## Add neutral IDs to the tadsAndCounties xls
+
+```{r neutralIds2}
+
+layerName <- "Greater_TADs_and_Counties"
+
+xlsToRead <- paste(home, boundarySourceFolder, layerName, ".xlsx", sep="")
+
+xlsToRead
+
+crosswalkTable <- read_xlsx(xlsToRead, col_names = TRUE)
+
+crosswalkTable$neutral_id <- gsub('^C1', 'C0', crosswalkTable$ctpp_id)
+
+crosswalkTable
+
+xlsToWrite <- xlsToRead
+
+write_xlsx(x = crosswalkTable, path = xlsToWrite, col_names = TRUE)
+```
+
+```
+
+
+## Misc (Just a few useful things)
+
+```{r misc}
+
+# Reorder columns
+CtppData <- CtppData[c(4, 5, 3)]
+
+# First 1 row
+acsData2[1,]
+
+# Sort rows
+ctppDataAggreg[order(-ctppDataAggreg$Total),]
+
+
+```

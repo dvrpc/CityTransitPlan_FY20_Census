@@ -1,0 +1,339 @@
+---
+title: "Minority_Status_TADlevel_10Counties_ImprovedAccuracy"
+---
+
+# Summary
+
+* Process the CTPP data: Minority Status at the TAD level for 10 counties (9 DVRPC counties + New Castle, DE.). The goal is to get numbers that are more accurate than the original TAD ones by using other data sources
+
+* Input: Several CVS files extracted from the CTPP site.  
+
+* Output: Produces a feature class at the County level with 6 data colums: (1) where do residents of philadelphia work (All, Minority, White)? and (2) where do workers in philadelphia come from  (All, Minority, White)? Both are merged and exported into the same Shp. The same data is also exported to Excel.
+
+
+* Last modified: 09/26/2019
+
+
+# Init
+
+Initialize the paths and names. 
+
+```{r init}
+
+library(zoo)
+library(dplyr)
+library(writexl) 
+library(sf)
+library(ggplot2)
+library(readxl) 
+
+
+home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data2ndPass/"
+
+theme <- "MinorityStatus"
+category1 <- "_Munlevel_PHL_to_Suburbs"
+category2 <- "_Munlevel_Suburbs_to_PHL"
+category3 <- "_TadLevel_PHL_to_NewCastle"
+category4 <- "_TadLevel_NewCastle_to_PHL"
+category5 <- "_TadLevel_PHL_to_PHL"
+
+tableSourceFolder <- "RawData/RawXls/improved_tads/"
+boundarySourceFolder <- "RelevantBoundaries/"
+outFolder <- "DisplayReadyData/"
+
+geoLayerName <- "TADlevel_10counties"
+
+
+```
+
+
+# Part I: Read the table data and clean it up
+
+## Read the raw CSV table
+
+```{r read_csv}
+
+load_file <- function(category){
+  # Read the file
+  fileToRead <- paste(home, tableSourceFolder, theme, category, ".csv", sep="")
+  fileToRead
+  ctppData <- read.csv(file=fileToRead, header=FALSE, sep="," ,skip=6)
+
+  # Remove that last line of the table (which is a note)
+  ctppData <- head(ctppData,-1)
+  
+  # Remove the Margin of Error fields
+  noMoE <- c(1,2,3,5,7)
+    
+  ctppData <- ctppData[noMoE]
+  
+  # Rename the fields
+  names(ctppData) <- c("RESIDENCE",	"WORKPLACE",	"Total", "White_not_hisp", "Minority")
+  
+  #str(ctppData)
+  ctppData
+}
+
+PHLToSuburbs <- load_file(category1)
+SuburbsToPHL <- load_file(category2)
+PHLToNewCastle <- load_file(category3)
+NewCastleToPHL <- load_file(category4)
+PHLToPHL <- load_file(category5)
+
+
+PHLToSuburbs
+SuburbsToPHL
+PHLToNewCastle
+NewCastleToPHL
+PHLToPHL
+
+```
+
+## Clean up
+
+```{r cleanup}
+
+cleanup <- function(ctppData){
+  #  Clean up ID columns: Fill up empty Residence cells (due to the "cell merge" presentation) with   
+  #  last previous value
+  ctppData$RESIDENCE[ctppData$RESIDENCE == ""] <- NA
+  ctppData$RESIDENCE <- na.locf(ctppData$RESIDENCE)
+  
+  # Find the number of columns in the dataframe
+  numCols <- ncol(ctppData)
+  
+  # Turn all quantitative cells to the numeric type, after having removed the potential comma. 
+  ctppData[3:numCols]<- lapply(ctppData[3:numCols], function(y) as.numeric(gsub(",", "", y)))
+  
+  ctppData
+}
+
+# create TAD IDs from the human-readable strings provided (for natively TAD-level data only)
+cleanupIds <- function(ctppData){
+  # Create IDs out of Residence and Workplace strings
+  ctppData$RESIDENCE <- gsub('TAD (\\d+), MPO (\\d+)', 'C0200US\\2\\1', ctppData$RESIDENCE)
+  ctppData$WORKPLACE <- gsub('TAD (\\d+), MPO (\\d+)', 'C0200US\\2\\1', ctppData$WORKPLACE)
+  
+  ctppData
+}
+
+PHLToSuburbs <- cleanup(PHLToSuburbs)
+SuburbsToPHL <- cleanup(SuburbsToPHL)
+
+PHLToNewCastle <- cleanup(PHLToNewCastle)
+PHLToNewCastle <- cleanupIds(PHLToNewCastle)
+
+NewCastleToPHL <- cleanup(NewCastleToPHL)
+NewCastleToPHL <- cleanupIds(NewCastleToPHL)
+PHLToPHL <- cleanup(PHLToPHL)
+PHLToPHL <- cleanupIds(PHLToPHL)
+
+PHLToSuburbs
+SuburbsToPHL
+PHLToNewCastle
+NewCastleToPHL
+PHLToPHL
+
+```
+
+
+## Aggregate from Municipalities to TADs 
+(for municipality-level data only)
+
+```{r aggregate_to_TADs}
+
+aggregatetoTADs <- function(ctppData, residence){
+  
+  # Read the Municipalities/TADs crosswalk table 
+  crossWalkFile <- paste(home, boundarySourceFolder, "Mun_to_TAD_crosswalk.xlsx", sep="")
+  munToTADs <- read_xlsx(crossWalkFile, col_names = TRUE)
+  
+  munToTADs
+  
+  # Join the Suburbs side (i.e., the non-PHL side) to the Municipalities/TADs crosswalk table
+  if (residence == "PHL"){
+    ctppDataWithTADs <- merge(ctppData, munToTADs, by.x="WORKPLACE", by.y="name")
+    ctppDataWithTADs <- ctppDataWithTADs[c("WORKPLACE", "neutral_id",  "Total", 
+                                          "White_not_hisp", "Minority" )]
+  }else{
+    ctppDataWithTADs <- merge(ctppData, munToTADs, by.x="RESIDENCE", by.y="name")
+    ctppDataWithTADs <- ctppDataWithTADs[c("RESIDENCE", "neutral_id",  "Total", 
+                                          "White_not_hisp", "Minority" )]
+  }
+  
+  # Find the number of columns in the dataframe
+  numCols <- ncol(ctppDataWithTADs)
+    
+  # Turn all quantitative cells to the numeric type, after having removed the potential comma. 
+  ctppDataWithTADs[3:numCols]<- lapply(ctppDataWithTADs[3:numCols], 
+                                       function(y) as.numeric(gsub(",", "", y)))
+  
+  # Then group by the data based on the TAD ID
+  ctppDataWithTADs <- aggregate(list(ctppDataWithTADs[3:numCols]), 
+                                by=list(TAD_ID = ctppDataWithTADs$neutral_id), FUN=sum, na.rm=TRUE)
+  ctppDataWithTADs
+}
+
+PHLToSuburbs <- aggregatetoTADs(PHLToSuburbs, residence="PHL")
+SuburbsToPHL <- aggregatetoTADs(SuburbsToPHL, residence="suburbs")
+
+PHLToSuburbs
+SuburbsToPHL
+
+```
+
+
+## Collapse PHL to 1 single location then multiply by constant factor 
+(for natively TAD-level data only)
+
+```{r collapse_PHL}
+
+# Group by the non-PHL side (which results in collapsing the PHL side)
+collapsePHL <- function(ctppData, residence){
+  # Find the number of columns in the dataframe
+  numCols <- ncol(ctppData)
+  
+  if (residence == "PHL"){
+    ctppDataAggreg <- aggregate(list(ctppData[3:numCols]), by=list(TAD_ID = ctppData$WORKPLACE), FUN=sum, na.rm=TRUE)
+  }else{
+    ctppDataAggreg <- aggregate(list(ctppData[3:numCols]), by=list(TAD_ID = ctppData$RESIDENCE), FUN=sum, na.rm=TRUE)
+  }
+  
+  ctppDataAggreg
+}
+
+
+# Multiply by the appropriate constant factor to make up for the Census undercounting of workplaces at the TAD level.
+# Note: the constant factors were computed separately based on the difference between county numbers and sums of TADs.
+
+MultiplyByFactor <- function(ctppData, rectifyingfactor){
+  ctppData[] = lapply(ctppData, FUN = function(x) if (is.numeric(x)) 
+    return(x * rectifyingfactor) else return(x))
+  ctppData
+}  
+
+
+PHLToNewCastle <- collapsePHL(PHLToNewCastle, residence="PHL")
+PHLToNewCastleRectified <- MultiplyByFactor(PHLToNewCastle, 1.23)
+NewCastleToPHL <- collapsePHL(NewCastleToPHL, residence="suburbs")
+NewCastleToPHLRectified <- MultiplyByFactor(NewCastleToPHL, 1.21)
+PHLToPHLRes <- collapsePHL(PHLToPHL, residence="PHL")
+PHLToPHLResRectified <- MultiplyByFactor(PHLToPHLRes, 1.21)
+PHLToPHLWp <- collapsePHL(PHLToPHL, residence="OtherSide")
+PHLToPHLWpRectified <- MultiplyByFactor(PHLToPHLWp, 1.21)
+
+PHLToNewCastle
+PHLToNewCastleRectified
+NewCastleToPHL
+NewCastleToPHLRectified
+PHLToPHLRes
+PHLToPHLResRectified
+PHLToPHLWp
+PHLToPHLWpRectified
+
+```
+
+## Get PHL as a residence and PHL as a workplace in the same dataframe
+
+```{r mergeBothFlows}
+
+mergeBothFlows <- function(PHLToSuburbsFlow, SuburbsToPHLFlow){
+  # Rename the fields according to whether they represent workplace or residence data
+  names(PHLToSuburbsFlow) <- c("WORKPLACE", "TotalWp", "WhiteWp", "MinorityWp")
+  names(SuburbsToPHLFlow) <- c("RESIDENCE", "TotalRe", "WhiteRe", "MinorityRe")
+  
+  BothFlows <- merge(PHLToSuburbsFlow, SuburbsToPHLFlow, by.x="WORKPLACE", by.y="RESIDENCE")
+  BothFlows <- BothFlows[c("WORKPLACE",	"TotalWp", "TotalRe", "WhiteWp", "WhiteRe", 
+                           "MinorityWp", "MinorityRe")]
+  names(BothFlows)[names(BothFlows)=="WORKPLACE"] <- "TAD_ID"
+  
+  BothFlows
+}
+
+PANJ_suburbs <- mergeBothFlows(PHLToSuburbs, SuburbsToPHL)
+NewCastle <- mergeBothFlows(PHLToNewCastleRectified, NewCastleToPHLRectified)
+Philadelphia <- mergeBothFlows(PHLToPHLResRectified, PHLToPHLWpRectified)
+
+PANJ_suburbs
+NewCastle 
+Philadelphia
+
+```
+
+## Append the dataframes for the 3 TAD regions (PANJ suburbs, New Castle, and Philadelphia)
+
+```{r Append_3_Regions}
+
+allTadRegionsData <- new <- rbind(PANJ_suburbs, NewCastle, Philadelphia)
+allTadRegionsData
+
+```
+
+
+## Load TAD boundaries shapefile for the 10 counties
+
+```{r load_geo_layer}
+
+# Read the TAD shapefile
+shpToRead <- paste(home, boundarySourceFolder, geoLayerName, ".shp", sep="")
+geoLayer = st_read(shpToRead)
+
+#str(geoLayer)
+geoLayer
+
+# Plot it
+plot(st_geometry(geoLayer), col = sf.colors(12, categorical = TRUE), border = 'grey', axes = TRUE)
+```
+
+
+## Merge (join) county boundaries and data table
+
+```{r merge_geo_and_data}
+
+# Join the non-PHL side to the Greater TADs.
+GeoTenCountyTotals <- merge(geoLayer, allTadRegionsData, by.x="neutral_id", by.y="TAD_ID")
+
+GeoTenCountyTotals
+```
+
+
+## Plot resulting County-level maps
+
+The field TotalRe or TotalWp is displayed.
+
+```{r plot_map, include=TRUE}
+
+ditch_the_axes <- theme(
+  axis.text = element_blank(),
+  axis.line = element_blank(),
+  axis.ticks = element_blank(),
+  panel.border = element_blank(),
+  panel.grid = element_blank(),
+  axis.title = element_blank()
+  )
+
+ggplot() + geom_sf(data = GeoTenCountyTotals,  aes(fill = TotalRe)) + theme_bw() + ditch_the_axes + scale_fill_gradient(low="#ccccff", high="#0000e6")
+
+ggplot() + geom_sf(data = GeoTenCountyTotals,  aes(fill = TotalWp)) + theme_bw() + ditch_the_axes + scale_fill_gradient(low="#ccccff", high="#0000e6")
+
+```
+
+# Part 3: Export
+## Export to Shapefile
+
+```{r export_to_shp, include=TRUE}
+
+shpToWrite <- paste0(home, outFolder, theme, "_TADLevel_10Counties.shp")
+st_write(GeoTenCountyTotals, shpToWrite, delete_layer=TRUE)
+
+```
+
+
+## Export to Excel
+
+```{r export_to_excel}
+
+fileToWrite <- paste(home, outFolder,"MinorityStatus_TADLevel_10Counties.xlsx", sep="")
+write_xlsx(x = allTadRegionsData, path = fileToWrite, col_names = TRUE)
+
+```

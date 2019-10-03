@@ -1,0 +1,177 @@
+---
+title: "MeansOfT_PHL_and_PHL"
+---
+
+# Summary
+
+* This script processes the Means of Transportation "PHL2PHL" data.
+
+* Input: Data extracted from the CTPP site and already cleaned up. Excel format. 
+
+* Output: Produces one feature class for each of the 6 "PHL area", with the Residence collapsed. Written to a shapefile.
+
+* Last modified: 8/20/2091
+
+
+# Init
+
+```{r init}
+
+library(sf)
+library(readxl) 
+library(ggplot2)
+
+home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data/"
+
+tableSourceFolder <- "GisReadyTables/"
+boundarySourceFolder <- "RelevantBoundaries/"
+outFolder <- "DisplayReadyData/"
+
+flowName <- "PHL2PHL"
+
+```
+
+# Main: Generate 6 PHL Area-level feature classes
+
+## Read the Excel table
+
+```{r read_excel}
+
+fileToRead <- paste(home, tableSourceFolder, "MeansOfT_", flowName, "_GisReady.xlsx", sep="")
+fileToRead
+ctppData <- read_xlsx(fileToRead, col_names = TRUE)
+
+# Make all the IDs "neutral" (not C1 or C3, which expresses Residence vs Workplace)
+ctppData$RESIDENCE <- gsub('^C1', 'C0', ctppData$RESIDENCE)
+ctppData$WORKPLACE <- gsub('^C3', 'C0', ctppData$WORKPLACE)
+
+# Rename some of the columns
+names(ctppData) <- gsub(x = names(ctppData), pattern = "_Est", replacement = "")  
+colnames(ctppData)[colnames(ctppData)=="Transit_Total"] <- "Tran_Tot"
+
+#str(ctppData)
+ctppData
+
+# For testing purposes: sum up all rows whose residence is Center City ("C0200US4219650100000101"):
+#test <- ctppData[ctppData$RESIDENCE=="C0200US4219650100000101",]
+#sum(test$Total)
+
+
+```
+
+
+## Join with TADs and "Larger Areas" crosswalk xls
+
+Note: We have divided Philadelphia into 6 Large Areas
+
+```{r join_to_crosswalk}
+
+# Read the crosswalk Excel file
+fileToRead <- paste(home, boundarySourceFolder, "PHL_TADs_and_Areas.xlsx", sep="")
+PhlTADsAndAreas <- read_xlsx(fileToRead, col_names = TRUE)
+
+# Join it to the main table for both the Residence and Workplace
+ctppDataAreas <- merge(ctppData, PhlTADsAndAreas, by.x="RESIDENCE", by.y="neutral_id", all.x = TRUE)
+colnames(ctppDataAreas)[which(names(ctppDataAreas) == "Area")] <- "Res_Area"
+ctppDataAreas
+
+ctppDataAreas2 <- merge(ctppDataAreas, PhlTADsAndAreas, by.x="WORKPLACE", by.y="neutral_id", all.x = TRUE)
+colnames(ctppDataAreas2)[which(names(ctppDataAreas2) == "Area")] <- "Work_Area"
+
+# Reorder the columns
+colsToSort <- c("RESIDENCE", "WORKPLACE", "Res_Area", "Work_Area")
+othercols <- setdiff(names(ctppDataAreas2), colsToSort)
+  
+ctppDataAreas2 <- ctppDataAreas2[c(colsToSort , othercols)]
+ctppDataAreas2
+
+# For testing purposes: sum up all rows whose residence is Center City ("Center"):
+#test2 <- ctppDataAreas2[ctppDataAreas2$Res_Area=="Center",]
+#sum(test2$Total)
+
+
+```
+
+## Collapse PHL TADs to Areas
+
+```{r collapse_PHL}
+
+# Group by Large Areas on both the Residence and the Workplace sides
+ctppDataAggreg <- aggregate(list(ctppDataAreas2[5:14]), by=list(Res_Area = ctppDataAreas2$Res_Area, Work_Area = ctppDataAreas2$Work_Area), FUN=sum, na.rm=TRUE)
+
+ctppDataAggreg
+
+```
+
+
+## Load PHL Large Area geo layer
+
+```{r load_geo_layer}
+
+# Read the shapefile
+layerName <- "PHL_Large_Areas"
+shpToRead <- paste(home, boundarySourceFolder, layerName, ".shp", sep="")
+geoLayer = st_read(shpToRead)
+
+# Keep only the columns of relevance
+geoLayer <- geoLayer[c("Large_Area", "geometry")]
+
+#str(geoLayer)
+geoLayer
+
+# Plot it
+plot(st_geometry(geoLayer), col = sf.colors(12, categorical = TRUE), border = 'grey', axes = TRUE)
+```
+
+## Generate feature classes for each residence area subset
+
+```{r merge_geo_and_data}
+
+# Generate subsets for each residence area by looping through every area
+PhlAreas <- unique(ctppDataAggreg$Res_Area)
+
+# Loop through every residence area
+for(a in PhlAreas){
+  # Generate the subset for that area
+  ctppDataSubset <- ctppDataAggreg[ctppDataAggreg$Res_Area == a,]
+
+  # Compute new percentage columns for every quantitative field
+  for(i in colnames(ctppDataSubset[3:12])){
+    ctppDataSubset[[paste0(i, "Pct")]] <- round((ctppDataSubset[[i]]/sum(ctppDataSubset[[i]]))*100, digits = 2)
+  }
+  
+  # Merge geolayer with the subset table data
+  geoLayerAreas <- merge(geoLayer, ctppDataSubset, by.x="Large_Area", by.y="Work_Area")
+  geoLayerAreas
+
+  colnames(geoLayerAreas)[colnames(geoLayerAreas)=="Large_Area"] <- "Workplace"
+  colnames(geoLayerAreas)[colnames(geoLayerAreas)=="Res_Area"] <- "Residence"
+  
+    
+  # Export to Shp
+  shpToWrite <- paste(home, outFolder, "MeansOfT_LargeAreas_", flowName, "_", a, "_full.shp", sep="")
+  shpToWrite
+  st_write(geoLayerAreas, shpToWrite, delete_layer=TRUE)
+  }
+
+
+```
+
+## Plot map
+
+For testing purposes
+
+```{r plot_map,  include=FALSE}
+
+ditch_the_axes <- theme(
+  axis.text = element_blank(),
+  axis.line = element_blank(),
+  axis.ticks = element_blank(),
+  panel.border = element_blank(),
+  panel.grid = element_blank(),
+  axis.title = element_blank()
+  )
+
+ggplot() + geom_sf(data = geoLayerAreas,  aes(fill = Total)) + theme_bw() + ditch_the_axes + scale_fill_gradient(low="#ccccff", high="#0000e6")
+
+```

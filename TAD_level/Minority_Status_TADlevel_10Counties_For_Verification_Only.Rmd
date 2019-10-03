@@ -1,0 +1,243 @@
+---
+title: "Minority_Status_TADlevel_10Counties_For_Verification_Only"
+---
+
+# Summary
+
+* Process the CTPP data: Minority Status at the TAD level for 10 counties (9 DVRPC counties + New Castle, DE.). We work directly with the (imperfect) TAD data and generate a shapefile with the main goal of comparing the results of the more complex process developed in "Minority_Status_TADlevel_10Counties_ImprovedAccuracy.Rmd"
+
+* Input: Two CVS files extracted from the CTPP site.  
+
+* Output: Produces a feature class at the County level with 6 data colums: (1) where do residents of philadelphia work (All, Minority, White)? and (2) where do workers in philadelphia come from  (All, Minority, White)? Both are merged and exported into the same Shp. The same data is also exported to Excel.
+ 
+
+* Last modified: 09/26/2019
+
+
+# Init
+
+Initialize the paths and names. 
+
+```{r init}
+
+library(zoo)
+library(dplyr)
+library(writexl) 
+library(sf)
+library(ggplot2)
+library(readxl) 
+
+
+home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data2ndPass/"
+
+theme <- "MinorityStatus"
+category1 <- "_TadLevel_PHL_to_10Counties"
+category2 <- "_TadLevel_10Counties_to_PHL"
+
+tableSourceFolder <- "RawData/RawXls/tads_for_verification/"
+boundarySourceFolder <- "RelevantBoundaries/"
+outFolder <- "DisplayReadyData/"
+
+geoLayerName <- "TADlevel_10counties"
+
+
+```
+
+
+# Part I: Read the table data and clean it up
+
+## Read the raw CSV table
+
+```{r read_csv}
+
+load_file <- function(category){
+  # Read the file
+  fileToRead <- paste(home, tableSourceFolder, theme, category, ".csv", sep="")
+  fileToRead
+  ctppData <- read.csv(file=fileToRead, header=FALSE, sep="," ,skip=6)
+
+  # Remove that last line of the table (which is a note)
+  ctppData <- head(ctppData,-1)
+  
+  # Remove the Margin of Error fields
+  noMoE <- c(1,2,3,5,7)
+    
+  ctppData <- ctppData[noMoE]
+  
+  # Rename the fields
+  names(ctppData) <- c("RESIDENCE",	"WORKPLACE",	"Total", "White_not_hisp", "Minority")
+  
+  #str(ctppData)
+  ctppData
+}
+
+PHLToTenCounties <- load_file(category1)
+TenCountiesToPHL <- load_file(category2)
+
+PHLToTenCounties
+TenCountiesToPHL
+
+```
+
+## Clean up
+
+```{r cleanup}
+
+cleanup <- function(ctppData){
+  #  Clean up ID columns: Fill up empty Residence cells (due to the "cell merge" presentation) with   
+  #  last previous value
+  ctppData$RESIDENCE[ctppData$RESIDENCE == ""] <- NA
+  ctppData$RESIDENCE <- na.locf(ctppData$RESIDENCE)
+  
+  # Find the number of columns in the dataframe
+  numCols <- ncol(ctppData)
+  
+  # Turn all quantitative cells to the numeric type, after having removed the potential comma. 
+  ctppData[3:numCols]<- lapply(ctppData[3:numCols], function(y) as.numeric(gsub(",", "", y)))
+  
+  ctppData
+}
+
+# create TAD IDs from the human-readable strings provided (for natively TAD-level data only)
+cleanupIds <- function(ctppData){
+  # Create IDs out of Residence and Workplace strings
+  ctppData$RESIDENCE <- gsub('TAD (\\d+), MPO (\\d+)', 'C0200US\\2\\1', ctppData$RESIDENCE)
+  ctppData$WORKPLACE <- gsub('TAD (\\d+), MPO (\\d+)', 'C0200US\\2\\1', ctppData$WORKPLACE)
+  
+  ctppData
+}
+
+PHLToTenCounties <- cleanup(PHLToTenCounties)
+PHLToTenCounties <- cleanupIds(PHLToTenCounties)
+TenCountiesToPHL <- cleanup(TenCountiesToPHL)
+TenCountiesToPHL <- cleanupIds(TenCountiesToPHL)
+
+PHLToTenCounties
+TenCountiesToPHL
+
+```
+
+
+
+
+
+## Collapse PHL to 1 single location 
+
+```{r collapse_PHL}
+
+# Group by the non-PHL side (which results in collapsing the PHL side)
+collapsePHL <- function(ctppData, residence){
+  # Find the number of columns in the dataframe
+  numCols <- ncol(ctppData)
+  
+  if (residence == "PHL"){
+    ctppDataAggreg <- aggregate(list(ctppData[3:numCols]), by=list(TAD_ID = ctppData$WORKPLACE), FUN=sum, na.rm=TRUE)
+  }else{
+    ctppDataAggreg <- aggregate(list(ctppData[3:numCols]), by=list(TAD_ID = ctppData$RESIDENCE), FUN=sum, na.rm=TRUE)
+  }
+  
+  ctppDataAggreg
+}
+
+
+PHLToTenCounties <- collapsePHL(PHLToTenCounties, residence="PHL")
+TenCountiesToPHL <- collapsePHL(TenCountiesToPHL, residence="suburbs")
+
+PHLToTenCounties
+TenCountiesToPHL
+
+
+```
+
+## Get PHL as a residence and PHL as a workplace in the same dataframe
+
+```{r mergeBothFlows}
+
+mergeBothFlows <- function(PHLToSuburbsFlow, SuburbsToPHLFlow){
+  # Rename the fields according to whether they represent workplace or residence data
+  names(PHLToSuburbsFlow) <- c("WORKPLACE", "TotalWp", "WhiteWp", "MinorityWp")
+  names(SuburbsToPHLFlow) <- c("RESIDENCE", "TotalRe", "WhiteRe", "MinorityRe")
+  
+  BothFlows <- merge(PHLToSuburbsFlow, SuburbsToPHLFlow, by.x="WORKPLACE", by.y="RESIDENCE")
+  BothFlows <- BothFlows[c("WORKPLACE",	"TotalWp", "TotalRe", "WhiteWp", "WhiteRe", 
+                           "MinorityWp", "MinorityRe")]
+  names(BothFlows)[names(BothFlows)=="WORKPLACE"] <- "TAD_ID"
+  
+  BothFlows
+}
+
+TenCounties <- mergeBothFlows(PHLToTenCounties, TenCountiesToPHL)
+
+TenCounties
+
+```
+
+
+
+## Load TAD boundaries shapefile for the 10 counties
+
+```{r load_geo_layer}
+
+# Read the TAD shapefile
+shpToRead <- paste(home, boundarySourceFolder, geoLayerName, ".shp", sep="")
+geoLayer = st_read(shpToRead)
+
+#str(geoLayer)
+geoLayer
+
+# Plot it
+plot(st_geometry(geoLayer), col = sf.colors(12, categorical = TRUE), border = 'grey', axes = TRUE)
+```
+
+
+## Merge (join) county boundaries and data table
+
+```{r merge_geo_and_data}
+
+# Join the non-PHL side to the Greater TADs.
+GeoTenCountyTotals <- merge(geoLayer, TenCounties, by.x="neutral_id", by.y="TAD_ID")
+
+GeoTenCountyTotals
+```
+
+
+## Plot resulting County-level maps
+
+The field TotalRe or TotalWp is displayed.
+
+```{r plot_map, include=TRUE}
+
+ditch_the_axes <- theme(
+  axis.text = element_blank(),
+  axis.line = element_blank(),
+  axis.ticks = element_blank(),
+  panel.border = element_blank(),
+  panel.grid = element_blank(),
+  axis.title = element_blank()
+  )
+
+ggplot() + geom_sf(data = GeoTenCountyTotals,  aes(fill = TotalRe)) + theme_bw() + ditch_the_axes + scale_fill_gradient(low="#ccccff", high="#0000e6")
+
+ggplot() + geom_sf(data = GeoTenCountyTotals,  aes(fill = TotalWp)) + theme_bw() + ditch_the_axes + scale_fill_gradient(low="#ccccff", high="#0000e6")
+
+```
+
+# Part 3: Export
+## Export to Shapefile
+
+```{r export_to_shp, include=TRUE}
+
+shpToWrite <- paste0(home, outFolder, theme, "_TADLevel_10Counties_For_Verification.shp")
+st_write(GeoTenCountyTotals, shpToWrite, delete_layer=TRUE)
+
+```
+
+
+## Export to Excel
+
+```{r export_to_excel}
+
+fileToWrite <- paste(home, outFolder,"MinorityStatus_TADLevel_10Counties_For_Verification.xlsx", sep="")
+write_xlsx(x = allTadRegionsData, path = fileToWrite, col_names = TRUE)
+
+```

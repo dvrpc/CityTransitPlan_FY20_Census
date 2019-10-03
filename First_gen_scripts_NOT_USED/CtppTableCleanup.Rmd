@@ -1,0 +1,93 @@
+---
+title: "CtppTableCleanup"
+---
+
+* This script functions for the Means of Transportation CTPP datasets.
+
+* Input: Raw data extracted from the CTPP site in the CSV format.  
+
+* Output: Produces cleaned-up tables in Excel format. 
+
+* Last modified: 8/20/2019
+
+
+
+# Init
+
+Initialize the paths and names. 
+
+```{r init}
+
+library(zoo)
+library(dplyr)
+library(writexl) 
+
+home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine/CityTransitPlanning/DataScrap/"
+
+#tableName <- "MeansOfT_PHL2PHL"
+tableName <- "MeansOfT_Greater2PHL"
+
+```
+
+## Read the raw CSV table
+
+```{r read_csv}
+
+# Read the file
+fileToRead <- paste(home, "RawData/RawXls/", tableName, ".csv", sep="")
+fileToRead
+CtppData <- read.csv(file=fileToRead, header=FALSE, sep="," ,skip=6)
+
+# Remove that last line of the table (which is a note)
+CtppData <- head(CtppData,-1)
+
+# Rename the fields
+names(CtppData) <- c("RESIDENCE",	"WORKPLACE",	"Total_Est",	"Total_MoE", "Bus_Est",	"Bus_MoE",	"Trolley_Est",	"Trolley_MoE",	"Subway_Est",	"Subway_MoE", "Rail_Est",	"Rail_MoE", "Home_Est",	"Home_MoE",	"Auto_Est",	"Auto_MoE",	"Active_Est",	"Active_MoE",	"Other_Est",	"Other_MoE", "Transit_Total_Est",	"Transit_Total_MoE")
+
+# Remove the Margin of Error fields
+noMoE <- c("RESIDENCE",	"WORKPLACE",	"Total_Est", "Bus_Est",		"Trolley_Est",	"Subway_Est", "Rail_Est", "Home_Est",	"Auto_Est",	"Active_Est",	"Other_Est", "Transit_Total_Est")
+
+CtppData <- CtppData[noMoE]
+
+#str(CtppData)
+CtppData
+
+```
+
+## Clean up ID columns
+
+```{r cleanup_ids}
+
+# Create IDs out of Residence and Workplace strings
+CtppData$RESIDENCE <- gsub('TAD (\\d+), MPO (\\d+)', 'C1200US\\2\\1', CtppData$RESIDENCE)
+CtppData$WORKPLACE <- gsub('TAD (\\d+), MPO (\\d+)', 'C3200US\\2\\1', CtppData$WORKPLACE)
+
+# Fill up empty Residence cells (due to the "cell merge" presentation) with last previous value
+CtppData$RESIDENCE[CtppData$RESIDENCE == ""] <- NA
+CtppData$RESIDENCE <- na.locf(CtppData$RESIDENCE)
+
+#CtppData$RESIDENCE
+CtppData
+
+```
+
+
+# Text to numeric
+
+``` {r text_to_numeric}
+
+# Turn all quantitative cells to the numeric type, after having removed the potential comma. 
+CtppData[3:12]<- lapply(CtppData[3:12], function(y) as.numeric(gsub(",", "", y)))
+
+head(CtppData, n=100)
+```
+
+
+## Export to Excel
+
+```{r export_to_excel}
+
+fileToWrite <- paste(home, "GisReadyTables/", tableName, "_GisReady.xlsx", sep="")
+write_xlsx(x = CtppData, path = fileToWrite, col_names = TRUE)
+
+```

@@ -1,0 +1,81 @@
+---
+title: "GenerateCentroids"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Init
+
+```{r init}
+
+library(sf)
+
+home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data2ndPass/"
+
+inFolder <- "RelevantBoundaries/"
+outFolder <- "RelevantBoundaries/"
+inputLayerName <- "10CountiesProj"
+outputLayerName <- "10CountiesCentroids"
+
+# Name of the ID field in the input layer
+idField <- "ctpp_id"
+
+
+```
+
+## Load the polygon layer
+
+```{r load_geo_layer}
+
+# Read the shapefile
+shpToRead <- paste(home, inFolder, inputLayerName, ".shp", sep="")
+geoLayer = st_read(shpToRead)
+
+# Keep only the columns of relevance: the ID and the shape
+geoLayer <- geoLayer[c(idField, "geometry")]
+
+geoLayer
+
+# Plot it
+plot(st_geometry(geoLayer), col = sf.colors(12, categorical = TRUE), border = 'grey', axes = TRUE)
+```
+
+
+## Generate the centroids for the polygons
+
+```{r centroids}
+
+# Compute the centroids based on the Geometry field
+geoLayer$centroids <- st_centroid(geoLayer$geometry)
+geoLayer
+
+# Copy the layer to a new "centroidLayer"
+centroidLayer <- geoLayer
+# Put the centroid coordinates in the main geometry field
+st_geometry(centroidLayer) <- centroidLayer$centroids
+# Keep only the ID field (the main geometry field will also be automatically kept)
+centroidLayer <- centroidLayer[c(idField)]
+centroidLayer
+
+# Plot it
+{plot(st_geometry(geoLayer), col = sf.colors(12, categorical = TRUE), border = 'grey', axes = TRUE)
+plot(st_geometry(centroidLayer), add = T, col = 'black')}
+
+```
+
+
+# Export to Shp
+
+```{r export_to_shp, include=TRUE}
+
+shpToWrite <- paste(home, outFolder, outputLayerName, ".shp", sep="")
+shpToWrite
+st_write(centroidLayer, shpToWrite, delete_layer=TRUE)
+
+```
+
+
+
+
