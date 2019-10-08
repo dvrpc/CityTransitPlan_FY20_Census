@@ -26,7 +26,7 @@ library(ggplot2)
 
 home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data2ndPass/"
 
-tableName <- "MeansOfT_10Counties"
+tableName <- "MeansOfT_Countylevel_10Counties"
 
 tableSourceFolder <- "GisReadyTables/"
 boundarySourceFolder <- "RelevantBoundaries/"

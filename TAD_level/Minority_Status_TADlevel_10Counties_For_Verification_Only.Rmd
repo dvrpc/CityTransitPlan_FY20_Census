@@ -84,7 +84,7 @@ TenCountiesToPHL
 ```{r cleanup}
 
 cleanup <- function(ctppData){
-  #  Clean up ID columns: Fill up empty Residence cells (due to the "cell merge" presentation) with   
+  #  Clean up ID columns: Fill up empty Residence cells (due to the "cell merge" presentation) with 
   #  last previous value
   ctppData$RESIDENCE[ctppData$RESIDENCE == ""] <- NA
   ctppData$RESIDENCE <- na.locf(ctppData$RESIDENCE)
@@ -98,7 +98,7 @@ cleanup <- function(ctppData){
   ctppData
 }
 
-# create TAD IDs from the human-readable strings provided (for natively TAD-level data only)
+# Create TAD IDs from the human-readable strings provided (for natively TAD-level data only)
 cleanupIds <- function(ctppData){
   # Create IDs out of Residence and Workplace strings
   ctppData$RESIDENCE <- gsub('TAD (\\d+), MPO (\\d+)', 'C0200US\\2\\1', ctppData$RESIDENCE)

@@ -1,17 +1,18 @@
 ---
-title: "Minority_Status_TADlevel_10Counties_ImprovedAccuracy"
+title: "ModeOfT_TADlevel_10Counties_ImprovedAccuracy"
 ---
+
 
 # Summary
 
-* Process the CTPP data: Minority Status at the TAD level for 10 counties (9 DVRPC counties + New Castle, DE.). The goal is to get numbers that are more accurate than the original TAD ones by using other data sources
+* Process the CTPP data: Mode of Transportation at the TAD level for 10 counties (9 DVRPC counties + New Castle, DE.). The goal is to get numbers that are more accurate than the original TAD ones by using other data sources.
 
 * Input: Several CVS files extracted from the CTPP site.  
 
-* Output: Produces a feature class at the County level with 6 data colums: (1) where do residents of philadelphia work (All, Minority, White)? and (2) where do workers in philadelphia come from  (All, Minority, White)? Both are merged and exported into the same Shp. The same data is also exported to Excel.
+* Output: Produces a feature class at the County level with several data colums reporting on: (1) where do residents of philadelphia work and how do they commute? and (2) where do workers in philadelphia come from and how do they commute? These questions are answered for several modes of transportation and especially Autos, Transit, and Active. All the data then is merged into a single table and exported into the same Shp. The same data is also exported to Excel.
 
 
-* Last modified: 09/26/2019
+* Last modified: 10/08/2019
 
 
 # Init
@@ -30,7 +31,7 @@ library(readxl)
 
 home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data2ndPass/"
 
-theme <- "MinorityStatus"
+theme <- "ModeOfT"
 category1 <- "_Munlevel_PHL_to_Suburbs"
 category2 <- "_Munlevel_Suburbs_to_PHL"
 category3 <- "_TadLevel_PHL_to_NewCastle"
@@ -63,13 +64,15 @@ load_file <- function(category){
   ctppData <- head(ctppData,-1)
   
   # Remove the Margin of Error fields
-  noMoE <- c(1,2,3,5,7)
+  noMoE <- c(1,2,3,5,7,9,11,13,15,17,19,21,23,25,27,29,31,33,35,37,39)
     
   ctppData <- ctppData[noMoE]
   
   # Rename the fields
-  names(ctppData) <- c("RESIDENCE",	"WORKPLACE",	"Total", "White_not_hisp", "Minority")
-  
+  names(ctppData) <- c("RESIDENCE",	"WORKPLACE",	"Total", "Car1", "Car2", "Car3", "Car4","Car5",
+                       "Car6", "Bus", "Trolley",	"Subway",	"Rail",	"Ferry", "Bicycle", "Walked", 
+                       "Taxi", "Motorcycle", "Other", "Home", "Auto")
+ 
   #str(ctppData)
   ctppData
 }
@@ -153,17 +156,21 @@ aggregatetoTADs <- function(ctppData, residence){
   # Join the Suburbs side (i.e., the non-PHL side) to the Municipalities/TADs crosswalk table
   if (residence == "PHL"){
     ctppDataWithTADs <- merge(ctppData, munToTADs, by.x="WORKPLACE", by.y="name")
-    ctppDataWithTADs <- ctppDataWithTADs[c("WORKPLACE", "neutral_id",  "Total", 
-                                          "White_not_hisp", "Minority" )]
+    ctppDataWithTADs <- ctppDataWithTADs[c("WORKPLACE", "neutral_id", "Total", "Car1", "Car2", 
+                                           "Car3", "Car4","Car5", "Car6", "Bus", "Trolley",	
+                                           "Subway",	"Rail",	"Ferry", "Bicycle", "Walked", 
+                                           "Taxi", "Motorcycle", "Other", "Home", "Auto")]
   }else{
     ctppDataWithTADs <- merge(ctppData, munToTADs, by.x="RESIDENCE", by.y="name")
-    ctppDataWithTADs <- ctppDataWithTADs[c("RESIDENCE", "neutral_id",  "Total", 
-                                          "White_not_hisp", "Minority" )]
+    ctppDataWithTADs <- ctppDataWithTADs[c("RESIDENCE", "neutral_id", "Total", "Car1", "Car2", 
+                                           "Car3", "Car4","Car5", "Car6", "Bus", "Trolley",	
+                                           "Subway",	"Rail",	"Ferry", "Bicycle", "Walked", 
+                                           "Taxi", "Motorcycle", "Other", "Home", "Auto")]
   }
   
   # Find the number of columns in the dataframe
   numCols <- ncol(ctppDataWithTADs)
-    
+  
   # Turn all quantitative cells to the numeric type, after having removed the potential comma. 
   ctppDataWithTADs[3:numCols]<- lapply(ctppDataWithTADs[3:numCols], 
                                        function(y) as.numeric(gsub(",", "", y)))
@@ -188,11 +195,12 @@ SuburbsToPHL
 
 ```{r collapse_PHL}
 
+
 # Group by the non-PHL side (which results in collapsing the PHL side)
 collapsePHL <- function(ctppData, residence){
   # Find the number of columns in the dataframe
   numCols <- ncol(ctppData)
-  
+
   if (residence == "PHL"){
     ctppDataAggreg <- aggregate(list(ctppData[3:numCols]), by=list(TAD_ID = ctppData$WORKPLACE), FUN=sum, na.rm=TRUE)
   }else{
@@ -208,7 +216,7 @@ collapsePHL <- function(ctppData, residence){
 
 MultiplyByFactor <- function(ctppData, rectifyingfactor){
   ctppData[] = lapply(ctppData, FUN = function(x) if (is.numeric(x)) 
-    return(x * rectifyingfactor) else return(x))
+    return(round(x * rectifyingfactor, digits = 0)) else return(x))
   ctppData
 }  
 
@@ -233,26 +241,69 @@ PHLToPHLWpRectified
 
 ```
 
-## Get PHL as a residence and PHL as a workplace in the same dataframe
+## Aggregate some of the columns
+
+``` {r aggregate_cols}
+
+aggregateCols <- function(ctppData){
+  # Sum up all public transit into the new field "Transit"
+  ctppData["Transit"] <-rowSums(ctppData[,c("Bus", "Trolley",	"Subway",	"Rail")])
+
+  # Sum up Bicycle and Walked into the new field "Active"
+  ctppData["Active"] <-rowSums(ctppData[,c("Bicycle", "Walked")])
+
+  # Sum up all others into the new field "Other2"
+  ctppData["Other2"] <-rowSums(ctppData[,c("Ferry", "Taxi", "Motorcycle", "Other")])
+
+  # Fool-proof test: sum up all large categories to compare to Total. HOWEVER, note that they will   
+  # not add up perfectly because of a cummulative rounding effect.
+  #ctppData["Total_Check"] <-rowSums(ctppData[,c("Transit", "Auto", "Active", "Home", "Other2")])
+
+  # Remove detail columns (add ""Total_Check" if wanting to do the check)
+  ctppData <- ctppData[c("TAD_ID",	"Total", "Transit", "Auto", "Active",
+                                     "Home", "Other2", "Bus", "Trolley",	"Subway",	"Rail",	
+                                     "Bicycle", "Walked")]
+  ctppData
+}
+
+PHLToSuburbsCompact <- aggregateCols(PHLToSuburbs)
+SuburbsToPHLCompact <- aggregateCols(SuburbsToPHL)
+PHLToNewCastleCompact <- aggregateCols(PHLToNewCastleRectified)
+NewCastleToPHLCompact <- aggregateCols(NewCastleToPHLRectified)
+PHLToPHLResCompact <- aggregateCols(PHLToPHLResRectified)
+PHLToPHLWpCompact <- aggregateCols(PHLToPHLWpRectified)
+
+PHLToSuburbsCompact
+SuburbsToPHLCompact
+PHLToNewCastleCompact
+NewCastleToPHLCompact
+PHLToPHLResCompact
+PHLToPHLWpCompact
+
+
+```
 
 ```{r mergeBothFlows}
 
 mergeBothFlows <- function(PHLToSuburbsFlow, SuburbsToPHLFlow){
   # Rename the fields according to whether they represent workplace or residence data
-  names(PHLToSuburbsFlow) <- c("WORKPLACE", "TotalWp", "WhiteWp", "MinorityWp")
-  names(SuburbsToPHLFlow) <- c("RESIDENCE", "TotalRe", "WhiteRe", "MinorityRe")
+  names(PHLToSuburbsFlow) <- c(  "WORKPLACE", "TotalWp", "TransitWp", "AutoWp", "ActiveWp",
+                                 "HomeWp", "Other2Wp", "BusWp", "TrolleyWp",	"SubwayWp",	
+                                 "RailWp", "BicycleWp", "WalkedWp")
+  names(SuburbsToPHLFlow) <- c("RESIDENCE", "TotalRe", "TransitRe", "AutoRe", "ActiveRe",
+                                 "HomeRe", "Other2Re", "BusRe", "TrolleyRe",	"SubwayRe",	
+                                 "RailRe", "BicycleRe", "WalkedRe")
   
   BothFlows <- merge(PHLToSuburbsFlow, SuburbsToPHLFlow, by.x="WORKPLACE", by.y="RESIDENCE")
-  BothFlows <- BothFlows[c("WORKPLACE",	"TotalWp", "TotalRe", "WhiteWp", "WhiteRe", 
-                           "MinorityWp", "MinorityRe")]
+  BothFlows <- BothFlows[c("WORKPLACE",	"TotalWp", "TotalRe", "TransitWp", "TransitRe", "AutoWp", "AutoRe", "ActiveWp", "ActiveRe", "HomeWp", "HomeRe", "Other2Wp", "Other2Re", "BusWp", "BusRe", "TrolleyWp", "TrolleyRe", "SubwayWp", "SubwayRe",	"RailWp", "RailRe", "BicycleWp", "BicycleRe", "WalkedWp", "WalkedRe")]
   names(BothFlows)[names(BothFlows)=="WORKPLACE"] <- "TAD_ID"
   
   BothFlows
 }
 
-PANJ_suburbs <- mergeBothFlows(PHLToSuburbs, SuburbsToPHL)
-NewCastle <- mergeBothFlows(PHLToNewCastleRectified, NewCastleToPHLRectified)
-Philadelphia <- mergeBothFlows(PHLToPHLResRectified, PHLToPHLWpRectified)
+PANJ_suburbs <- mergeBothFlows(PHLToSuburbsCompact, SuburbsToPHLCompact)
+NewCastle <- mergeBothFlows(PHLToNewCastleCompact, NewCastleToPHLCompact)
+Philadelphia <- mergeBothFlows(PHLToPHLResCompact, PHLToPHLWpCompact)
 
 PANJ_suburbs
 NewCastle 
@@ -333,7 +384,7 @@ st_write(GeoTenCountyTotals, shpToWrite, delete_layer=TRUE)
 
 ```{r export_to_excel}
 
-fileToWrite <- paste(home, outFolder,"MinorityStatus_TADLevel_10Counties.xlsx", sep="")
+fileToWrite <- paste0(home, outFolder, theme, "_TADLevel_10Countiesxlsx")
 write_xlsx(x = allTadRegionsData, path = fileToWrite, col_names = TRUE)
 
 ```

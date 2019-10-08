@@ -95,7 +95,7 @@ PHLToPHL
 ```{r cleanup}
 
 cleanup <- function(ctppData){
-  #  Clean up ID columns: Fill up empty Residence cells (due to the "cell merge" presentation) with   
+  #  Clean up ID columns: Fill up empty Residence cells (due to the "cell merge" presentation) with 
   #  last previous value
   ctppData$RESIDENCE[ctppData$RESIDENCE == ""] <- NA
   ctppData$RESIDENCE <- na.locf(ctppData$RESIDENCE)
@@ -109,7 +109,7 @@ cleanup <- function(ctppData){
   ctppData
 }
 
-# create TAD IDs from the human-readable strings provided (for natively TAD-level data only)
+# Create TAD IDs from the human-readable strings provided (for natively TAD-level data only)
 cleanupIds <- function(ctppData){
   # Create IDs out of Residence and Workplace strings
   ctppData$RESIDENCE <- gsub('TAD (\\d+), MPO (\\d+)', 'C0200US\\2\\1', ctppData$RESIDENCE)
@@ -240,7 +240,7 @@ PHLToPHLWpRectified
 ``` {r aggregate_cols}
 
 aggregateCols <- function(ctppData){
-  # Sum up all public transit into "Transit"
+  # Sum up the two levels of "above poverty line" into the new field "Above_PL"
   ctppData["Above_PL"] <-rowSums(ctppData[,c("Above_PL_100_to_149", "Above_PL_150_and_more")])
   
   # Remove detail columns
