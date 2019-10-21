@@ -4,7 +4,7 @@ title: "VehiclePopRatio"
 
 # Summary
 
-* This script processes several datasets that were extracted from the Census FactFinder at the Census block group level. 
+* This script processes a dataset that was extracted from the Census FactFinder at the Census block group level. 
 
 * The goal is to generate a map showing the percentage of the population that lacks access to a vehicle.
 
