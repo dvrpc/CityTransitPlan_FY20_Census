@@ -89,7 +89,7 @@ ctppData
 ```
 
 
-# Part II: Generate two county-level feature classes
+# Part II: Generate county-level feature class
 
 ## Keep only PHL as a residence and PHL as a workplace
 
@@ -177,7 +177,7 @@ ggplot() + geom_sf(data = GeoTenCountyTotals,  aes(fill = TotalWp)) + theme_bw()
 
 ```
 
-# Part 3: Export
+# Part III: Export
 ## Export to Shapefile
 
 ```{r export_to_shp, include=TRUE}
