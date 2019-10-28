@@ -137,6 +137,7 @@ PHLToPHL
 
 ```
 
+# Part II: Generate TAD-level feature class
 
 ## Aggregate from Municipalities to TADs 
 (for municipality-level data only)
@@ -266,6 +267,8 @@ PHLToPHLWpCompact
 
 ```
 
+## Get PHL as a residence and PHL as a workplace in the same dataframe (for  PANJ suburbs, New Castle, and Philadelphia)
+
 ```{r mergeBothFlows}
 
 mergeBothFlows <- function(PHLToSuburbsFlow, SuburbsToPHLFlow){
@@ -317,7 +320,7 @@ plot(st_geometry(geoLayer), col = sf.colors(12, categorical = TRUE), border = 'g
 ```
 
 
-## Merge (join) county boundaries and data table
+## Merge (join) TAD boundaries and data table
 
 ```{r merge_geo_and_data}
 
@@ -328,7 +331,7 @@ GeoTenCountyTotals
 ```
 
 
-## Plot resulting County-level maps
+## Plot resulting TAD-level maps
 
 The field TotalRe or TotalWp is displayed.
 
@@ -349,7 +352,7 @@ ggplot() + geom_sf(data = GeoTenCountyTotals,  aes(fill = TotalWp)) + theme_bw()
 
 ```
 
-# Part 3: Export
+# Part III: Export
 ## Export to Shapefile
 
 ```{r export_to_shp, include=TRUE}
