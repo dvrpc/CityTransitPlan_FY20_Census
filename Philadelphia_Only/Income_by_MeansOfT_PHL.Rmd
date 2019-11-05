@@ -1,0 +1,160 @@
+---
+title: "MeansOfT_Countylevel_10Counties"
+---
+
+# Summary
+
+* Process the CTPP data: Income by Means Transportation for Philadelphia County as a residence. 
+
+* Input: Single CSV file extracted from the CTPP site representing the means of transportation breakdown for 25 different income brackets (4 rows and 573 columns).  
+
+* Output: Produces an Excel file where the data has been restructured and aggregated (8 columns and 6 rows). It is ready to generate pie or bar charts.
+
+* Last modified: 11/05/2019
+
+# Init
+
+Initialize the paths and names. 
+
+```{r init}
+
+library(zoo)
+library(dplyr)
+library(writexl) 
+library(sf)
+library(ggplot2)
+
+home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data3rdPass/"
+
+tableName <- "IncomeByModeOfT_PHL"
+
+tableSourceFolder <- "GisReadyTables/"
+outFolder <- "DisplayReadyData/"
+
+```
+
+## Read the raw CSV table and transpose it
+
+```{r read_csv}
+
+# Read the file
+fileToRead <- paste(home, "RawData/RawXls/", tableName, ".csv", sep="")
+fileToRead
+ctppData <- read.csv(file=fileToRead, header=FALSE, sep="," ,skip=3)
+
+# Remove that last line of the table (which is a note)
+ctppData <- head(ctppData,-1)
+
+# Transpose rows into columns to get a dataframe of 4 columns and 573 rows
+ctppData2 <- data.frame(t(ctppData[-1]))
+colnames(ctppData2) <- ctppData[, 1]
+
+# Remove the Residence column, which is empty
+ctppData3 <- ctppData2[c(1,2,3,5)]
+
+# Rename the columns
+colnames(ctppData3) <- c("Income_bracket", "MeansOfT_Category", "Value_Type", "Num_Of_People")
+
+ctppData <- ctppData3
+
+ctppData
+
+```
+
+## Do some cleanup
+
+```{r cleanup_ids}
+
+# Fill up empty Income_Bracket cells (due to the "cell merge" presentation) with last previous value
+ctppData$Income_bracket[ctppData$Income_bracket == ""] <- NA
+ctppData$Income_bracket <- na.locf(ctppData$Income_bracket)
+
+# Keep only the rows containing Estimates (drop the Margin of Error rows)
+ctppData <- ctppData[ which(ctppData$Value_Type == 'Estimate'),]
+
+# Remove column Value_Type which is now useless
+ctppData <- ctppData[c(1,2,4)]
+
+ctppData
+
+```
+
+
+## Convert quantitative cells from text columns to numeric
+
+``` {r text_to_numeric}
+
+ctppData$Num_Of_People <- as.numeric(gsub(",", "", ctppData$Num_Of_People))
+
+ctppData
+```
+
+## Generate a dataframe with one column per income bracket
+
+```{r one_column_per_bracket}
+
+# Create a dataframe seed with just a MeansOfT_Category column
+merged_df <- ctppData[ctppData$Income_bracket == "Total, household income",]
+merged_df <- merged_df[2] 
+
+# Get the list of all unique income brackets in the original data
+income_category  <- unique(ctppData$Income_bracket)
+
+# Loop through the list of income brackets to get the number of people values for each bracket in each MeansOfT category
+# and add them as a new column to the new dataframe  
+for(i in income_category){
+  ctppDataTemp <- ctppData[ctppData$Income_bracket == i,]
+  colnames(ctppDataTemp)[colnames(ctppDataTemp)=="Num_Of_People"] <- i
+  ctppDataTemp <- ctppDataTemp[c(2,3)]
+  merged_df <- merge(merged_df, ctppDataTemp, by="MeansOfT_Category")
+}
+
+merged_df
+
+```
+
+## Transpose rows into columns again
+
+```{r transpose_again}
+
+# Transpose rows into columns to get a dataframe of 11 columns and 27 rows 
+ctppDataAggreg <- data.frame(t(merged_df[-1]))
+colnames(ctppDataAggreg) <- merged_df[, 1]
+
+ctppDataAggreg
+```
+
+## Aggregate some of the means of transportation columns
+
+``` {r aggregate_cols}
+
+# Sum up the 3 car-related categories into "Auto"
+ctppDataAggreg["Auto"] <-rowSums(ctppDataAggreg[,c("Car, truck, or van -- Drove alone", "Car, truck, or van -- In a 2-person carpool", "Car, truck, or van -- In a 3-or-more person carpool")])
+
+# Sum up all public transit into "Transit"
+ctppDataAggreg["Transit"] <-rowSums(ctppDataAggreg[,c("Bus or trolley bus", "Railroad or ferryboat",	"Streetcar, trolley car, subway, or elevated")])
+
+# Sum up Bicycle and Walked into "Active"
+ctppDataAggreg["Active"] <-rowSums(ctppDataAggreg[,c("Bicycle", "Walked")])
+
+# Sum up all others into "Other"
+ctppDataAggreg["Other"] <-rowSums(ctppDataAggreg[,c("Taxicab, motorcycle or other method", "Worked at home")])
+
+# Remove detail columns
+ctppDataAggreg <- ctppDataAggreg[c("Bus or trolley bus", "Railroad or ferryboat", "Streetcar, trolley car, subway, or elevated",  "Auto", "Transit", "Active", "Other", "Total, means of transportation")]
+
+colnames(ctppDataAggreg) <- c("Bus or trolley", "Railroad", "Subway",  "Auto", "Transit", "Active", "Other", "Total")
+  
+ctppDataAggreg
+
+```
+
+## Export to Excel
+
+```{r export_to_excel}
+
+fileToWrite <- paste(home, outFolder, tableName, "PREPPED.xlsx", sep="")
+write_xlsx(x = ctppDataAggreg, path = fileToWrite, col_names = TRUE)
+
+```
+
