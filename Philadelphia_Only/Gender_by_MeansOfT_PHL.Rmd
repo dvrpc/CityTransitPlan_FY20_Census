@@ -4,9 +4,8 @@ title: "Gender_by_MeansOfT_PHL"
 
 # Summary
 
-* Process the CTPP data: Income by Means Transportation for Philadelphia County as a residence. 
-
-* Input: Single CSV file extracted from the CTPP site representing the means of transportation breakdown for 25 different income brackets (4 rows and 573 columns).  
+* Process the data downloaded from the Census fact finder: Gender by Means Transportation for Philadelphia County as a residence (B08006, ACS 2016 5 years). 
+* Input: Single CSV file representing the means of transportation breakdown by gender (4 rows and 573 columns).  
 
 * Output: Produces an Excel file where the data has been restructured and aggregated (8 columns and 6 rows). It is ready to generate pie or bar charts.
 
@@ -26,7 +25,7 @@ library(ggplot2)
 
 home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data3rdPass/"
 
-tableName <- "IncomeByModeOfT_PHL"
+tableName <- "GenderByModeOfT_PHL"
 
 tableSourceFolder <- "GisReadyTables/"
 outFolder <- "DisplayReadyData/"
@@ -40,22 +39,21 @@ outFolder <- "DisplayReadyData/"
 # Read the file
 fileToRead <- paste(home, "RawData/RawXls/", tableName, ".csv", sep="")
 fileToRead
-ctppData <- read.csv(file=fileToRead, header=FALSE, sep="," ,skip=3)
-
-# Remove that last line of the table (which is a note)
-ctppData <- head(ctppData,-1)
+ctppData <- read.csv(file=fileToRead, header=FALSE, sep="," ,skip=0)
 
 # Transpose rows into columns to get a dataframe of 4 columns and 573 rows
-ctppData2 <- data.frame(t(ctppData[-1]))
-colnames(ctppData2) <- ctppData[, 1]
-
-# Remove the Residence column, which is empty
-ctppData3 <- ctppData2[c(1,2,3,5)]
+ctppData2 <- data.frame(t(ctppData))
 
 # Rename the columns
-colnames(ctppData3) <- c("Income_bracket", "MeansOfT_Category", "Value_Type", "Num_Of_People")
+colnames(ctppData2) <- c("ID", "Pretty_Name", "Num_of_People")
 
-ctppData <- ctppData3
+# Remove the first 3 rows, which contain geography IDs
+ctppData2 <- ctppData2[ -c(1, 2, 3), ]
+
+## Remove the Residence column, which is empty
+#ctppData3 <- ctppData2[c(1,2,3,5)]
+
+ctppData <- ctppData2
 
 ctppData
 
@@ -65,16 +63,21 @@ ctppData
 
 ```{r cleanup_ids}
 
-# Fill up empty Income_Bracket cells (due to the "cell merge" presentation) with last previous value
-ctppData$Income_bracket[ctppData$Income_bracket == ""] <- NA
-ctppData$Income_bracket <- na.locf(ctppData$Income_bracket)
-
 # Keep only the rows containing Estimates (drop the Margin of Error rows)
-ctppData <- ctppData[ which(ctppData$Value_Type == 'Estimate'),]
+ctppData3 <- subset(ctppData, grepl("Estimate", Pretty_Name),)
 
-# Remove column Value_Type which is now useless
-ctppData <- ctppData[c(1,2,4)]
+# Create new column MeansOfT_Category
+ctppData3$MeansOfT_Category <- ctppData3$Pretty_Name
+ctppData3$MeansOfT_Category <- sub("Estimate; Total: - \\S*: - ", "", ctppData3$MeansOfT_Category)
+ctppData3$MeansOfT_Category <- sub("Estimate; Total: - ", "", ctppData3$MeansOfT_Category)
+ctppData3$MeansOfT_Category <- sub("Estimate; Total:", "Total:", ctppData3$MeansOfT_Category)
 
+# Create new column Who
+ctppData3$Who <- ctppData3$Pretty_Name
+ctppData3$Who <- sub("Estimate; Total: - (\\S*):.*$", "\\1", ctppData3$Who)
+ctppData3$Who <- sub("^.*(Total).*$", "\\1", ctppData3$Who)
+
+ctppData <- ctppData3[c("Who","MeansOfT_Category", "Num_of_People")] 
 ctppData
 
 ```
@@ -84,7 +87,7 @@ ctppData
 
 ``` {r text_to_numeric}
 
-ctppData$Num_Of_People <- as.numeric(gsub(",", "", ctppData$Num_Of_People))
+ctppData$Num_of_People <- as.numeric(ctppData$Num_of_People)
 
 ctppData
 ```
