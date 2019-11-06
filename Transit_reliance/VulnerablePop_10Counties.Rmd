@@ -1,0 +1,242 @@
+---
+title: "VulnerablePop_10Counties"
+---
+
+# Summary
+
+* This script processes several datasets that were extracted from the Census FactFinder at the Census block group level. 
+
+* The goal is to generate a map of vulnerable populations in Philadelphia plus 9 surrounding counties that are unlikely to own a car. 
+
+* Output: Produces a feature classes at the block group level, exported as a Shp.
+
+* Last modified: 11/06/2019
+
+* For more documentation, see: https://docs.google.com/document/d/15k84IpB26IW4qqVZCuR_g4R6JqTjTDz7RJd8_9FROGg/edit?usp=sharing
+
+
+# Init
+
+Initialize the paths and names. 
+
+```{r init}
+
+library(sf)
+library(ggplot2)
+
+
+# Paths
+home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data3rdPass/"
+tableSourceFolder <- "RawData/RawXls/"
+boundarySourceFolder <- "RelevantBoundaries/"
+outFolder <- "DisplayReadyData/Shp/"
+
+# Dataset names
+geoLayerName <- "10Counties_Blockgroups_Proj"
+
+outputLayerName <- "Vulnerability_Index"
+
+```
+
+## Get the disability data
+
+```{r get_disability}
+
+origSet1 <- "ReceiptOfFoodStamps_10Counties/ACS_17_5YR_B22010"  # SNAP / Food stamps
+
+fileToRead1 <- paste(home, tableSourceFolder, origSet1,"_with_ann.csv", sep="")
+#fileToRead1
+acsData1 <- read.csv(file=fileToRead1, header=TRUE, sep=",")
+acsData1 <- acsData1[-1, ]
+
+# Keep only the columns of relevance (ID, Total households, Households with 1 or more 
+# persons with a disability that received / did not receive Food Stamps)
+acsData1 <- acsData1[c("GEO.id2", "HD01_VD01", "HD01_VD03", "HD01_VD06")]
+
+# Convert them to the right format (from the original "factor" type)
+acsData1[,2:4] <- sapply(acsData1[,2:4], as.character)
+acsData1[,2:4] <- sapply(acsData1[,2:4], as.numeric)
+
+# Add all households with one or more persons with a disability, and divide by the total number of households
+acsData1["Disabil_Pct"] <- (acsData1$HD01_VD03 + acsData1$HD01_VD06) / acsData1$HD01_VD01
+
+# Sort by descending order (just to review the data)
+#acsData1[order(-acsData1$Disabil_Pct),]
+#subset(acsData1,acsData1$GEO.id2=="421019891001")
+
+# Keep only the columns of relevance
+acsData1 <- acsData1[c("GEO.id2", "Disabil_Pct", "HD01_VD01")]
+colnames(acsData1)[colnames(acsData1)=="HD01_VD01"] <- "Total_HH"
+
+acsData1
+
+
+```
+
+
+## Get the poverty status data
+
+```{r get_poverty}
+
+origSet2 <- "Poverty_10Counties/ACS_17_5YR_B17017"  # Poverty status
+
+fileToRead2 <- paste(home, tableSourceFolder, origSet2, "_with_ann.csv", sep="")
+#fileToRead2
+acsData2 <- read.csv(file=fileToRead2, header=TRUE, sep=",")
+acsData2 <- acsData2[-1, ]
+
+# Keep only the columns of relevance (ID, total households, HH with income in the past 12 months below poverty level)
+acsData2 <- acsData2[c("GEO.id2", "HD01_VD01", "HD01_VD02")]
+
+# Convert them to the right format (from the original "factor" type)
+acsData2[,2:3] <- sapply(acsData2[,2:3], as.character)
+acsData2[,2:3] <- sapply(acsData2[,2:3], as.numeric)
+
+
+# Divide the number of households below poverty level by the total number of households in the block group:
+acsData2["Poverty_Pct"]<- acsData2$HD01_VD02 / acsData2$HD01_VD01
+
+# Keep only the columns of relevance
+acsData2 <- acsData2[c("GEO.id2", "Poverty_Pct")]
+
+acsData2
+```
+
+
+## Get the elderly data
+
+```{r get_elderly}
+
+origSet3 <- "SexByAge_10Counties/ACS_17_5YR_B01001"  # Sex by age
+
+fileToRead3 <- paste(home, tableSourceFolder, origSet3, "_with_ann.csv", sep="")
+#fileToRead3
+acsData3 <- read.csv(file=fileToRead3, header=TRUE, sep=",")
+acsData3 <- acsData3[-1, ]
+
+# Keep only the columns of relevance (ID, Total population, Male and Female population 65 years old and up)
+acsData3 <- acsData3[c("GEO.id2", "HD01_VD01", "HD01_VD20", "HD01_VD21", "HD01_VD22", "HD01_VD23", "HD01_VD24", "HD01_VD25", "HD01_VD44", "HD01_VD45", "HD01_VD46", "HD01_VD47", "HD01_VD48", "HD01_VD49")]
+
+# Convert them to the right format (from the original "factor" type)
+acsData3[,2:14] <- sapply(acsData3[,2:14], as.character)
+acsData3[,2:14] <- sapply(acsData3[,2:14], as.numeric)
+
+
+# Sum up the variables for all people 65 and above (male and female)
+acsData3["Total_Elderly"]<- rowSums(acsData3[,c("HD01_VD20", "HD01_VD21", "HD01_VD22", "HD01_VD23", "HD01_VD24", "HD01_VD25", "HD01_VD44", "HD01_VD45", "HD01_VD46", "HD01_VD47", "HD01_VD48", "HD01_VD49")])
+
+
+#Divide by the total number of households
+acsData3["Elderly_Pct"]<- acsData3$Total_Elderly / acsData3$HD01_VD01
+
+# Keep only the columns of relevance
+acsData3 <- acsData3[c("GEO.id2", "Elderly_Pct", "HD01_VD01")]
+colnames(acsData3)[colnames(acsData3)=="HD01_VD01"] <- "Total_Pop"
+
+acsData3
+#str(acsData3)
+
+
+```
+
+## Merge all the datasets into one single table
+```{r merge_all}
+
+acsData <- Reduce(function(x, y) merge(x, y, by="GEO.id2", all=TRUE), list(acsData1, acsData2, acsData3))
+
+# Remove the rows where the total population or number of households is 0
+acsData <- subset(acsData,acsData$Total_Pop > 0 & acsData$Total_HH >0) 
+
+acsData
+
+
+```
+
+## Compute the vulnerability index (possible score: 0 to 100)
+```{r compute_index}
+
+# Sum up the 3 variables computed so far 
+acsData["Vulnerability_Sum"]<- rowSums(acsData[,c("Disabil_Pct", "Poverty_Pct", "Elderly_Pct")])
+
+#Divide by 3 and multiply by 100 to get a 0-100 score 
+acsData["Vulner_Indx"]<- round((acsData$Vulnerability_Sum / 3) * 100, digits = 2)
+
+# Sort by descending order (just to review the data)
+#acsData[order(-acsData$Vulner_Indx),] 
+#acsData[order(-acsData$Disabil_Pct),] 
+#acsData[order(-acsData$Poverty_Pct),] 
+#acsData[order(-acsData$Elderly_Pct),] 
+
+# Reorder the columns (and drop useless ones)
+acsData <- acsData[c(1, 8, 2, 4, 5, 3, 6)]
+acsData
+
+
+```
+
+## Load PHL geo layer
+
+```{r load_geo_layer}
+
+# Read the shapefile
+shpToRead <- paste(home, boundarySourceFolder, geoLayerName,".shp", sep="")
+
+geoLayer = st_read(shpToRead)
+
+# Keep only the columns of relevance
+geoLayer <- geoLayer[c("GEOID", "ALAND", "geometry")]
+
+#str(geoLayer)
+geoLayer
+str(geoLayer)
+
+# Plot it
+plot(st_geometry(geoLayer), col = sf.colors(12, categorical = TRUE), border = 'grey', axes = TRUE)
+```
+
+## Merge geolayer and table data
+
+```{r merge_geo_and_data}
+
+geoLayerWithData <- merge(geoLayer, acsData, by.x="GEOID", by.y="GEO.id2")
+
+# Sort by descending order / check for NA values etc. (just to review the data)
+#geoLayerWithData[order(-acsData$Vulner_Indx),] 
+subset(geoLayerWithData,geoLayerWithData$Vulner_Indx=="NaN") 
+#subset(geoLayerWithData,geoLayerWithData$GEOID10=="421019804001") 
+#subset(geoLayerWithData,geoLayerWithData$GEOID10=="421019891001") 
+
+geoLayerWithData 
+
+```
+
+## Plot map
+
+For testing purposes.
+
+```{r plot_map,  include=FALSE}
+
+ditch_the_axes <- theme(
+  axis.text = element_blank(),
+  axis.line = element_blank(),
+  axis.ticks = element_blank(),
+  panel.border = element_blank(),
+  panel.grid = element_blank(),
+  axis.title = element_blank()
+  )
+
+ggplot() + geom_sf(data = geoLayerWithData,  aes(fill = Vulner_Indx)) + theme_bw() + ditch_the_axes + scale_fill_gradient(low="#ccccff", high="#0000e6")
+
+```
+
+
+## Export to Shp
+
+```{r export_to_shp}
+
+shpToWrite <- paste(home, outFolder,  outputLayerName, ".shp", sep="")
+shpToWrite
+st_write(geoLayerWithData, shpToWrite, delete_layer=TRUE)
+
+```
+
