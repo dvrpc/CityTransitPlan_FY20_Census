@@ -6,7 +6,7 @@ title: "VehiclePopRatio_10Counties"
 
 * This script processes a dataset that was extracted from the Census FactFinder at the Census block group level. 
 
-* The goal is to generate a map showing the percentage of the population that lacks access to a vehicle.
+* The goal is to generate a map showing the percentage of the population in Philadelphia plus 9 surrounding counties that lacks access to a vehicle.
 
 * Output: Produces a feature class at the block group level, exported as a Shp.
 
