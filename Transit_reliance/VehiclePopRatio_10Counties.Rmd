@@ -1,0 +1,142 @@
+---
+title: "VehiclePopRatio_10Counties"
+---
+
+# Summary
+
+* This script processes a dataset that was extracted from the Census FactFinder at the Census block group level. 
+
+* The goal is to generate a map showing the percentage of the population that lacks access to a vehicle.
+
+* Output: Produces a feature class at the block group level, exported as a Shp.
+
+* Last modified: 11/06/2019
+
+* For more documentation, see https://docs.google.com/document/d/121wuW2rLnx1hJ-_4_Ew7crX0tLyWc8PaEUwvSNwggeU/edit?usp=sharing
+
+
+# Init
+
+Initialize the paths and names. 
+
+```{r init}
+
+library(sf)
+library(ggplot2)
+
+# Paths
+home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data3rdPass/"
+tableSourceFolder <- "RawData/RawXls/VehiclesAvailable_10Counties/"
+boundarySourceFolder <- "RelevantBoundaries/"
+outFolder <- "DisplayReadyData/Shp/"
+
+# Dataset names
+origSet <- "ACS_17_5YR_B25044"  #  Tenure by Vehicles Available
+geoLayerName <- "10Counties_Blockgroups_Proj"
+outputLayerName <- "ZeroVehicleRatio"
+```
+
+## Get the vehicle data
+
+```{r get_vehicles}
+
+fileToRead <- paste(home, tableSourceFolder, origSet, "_with_ann.csv", sep="")
+fileToRead
+acsData <- read.csv(file=fileToRead, header=TRUE, sep=",")
+acsData <- acsData[-1, ]
+
+# Keep only the columns of relevance and rename field: 
+# GeoID, total number of occupied housing units (OHU), Owner with 0 vehicles,
+# Renter with 0 vehicles)
+acsData <- acsData[c("GEO.id2", "HD01_VD01", "HD01_VD03", "HD01_VD10")]
+
+# Convert them to the right format (from the original "factor" type)
+acsData[,2:4] <- sapply(acsData[,2:4], as.character)
+acsData[,2:4] <- sapply(acsData[,2:4], as.numeric)
+
+# Add all OHU with 0 vehicles available (owner + renter), and divide by the total number of OHU
+acsData["Total_ZeroVehicule"] <- (acsData$HD01_VD03 + acsData$HD01_VD10) 
+acsData["ZeroVehicule_Pct"] <- round((acsData$Total_ZeroVehicule / acsData$HD01_VD01) * 100, digits = 2)
+  
+colnames(acsData)[colnames(acsData)=="HD01_VD01"] <- "Total_OHU"
+
+# Remove the rows where the total OHU is 0
+acsData <- subset(acsData, acsData$Total_OHU > 0 ) 
+
+# Keep only the columns of relevance and reorder the columns
+ acsData <- acsData[c("GEO.id2","Total_ZeroVehicule", "Total_OHU",  "ZeroVehicule_Pct")]
+
+# Sort by descending order (just to review the data)
+#acsData[order(acsData$Total_OHU),]
+#acsData[order(-acsData$ZeroVehicule_Pct),]
+
+acsData
+
+
+```
+
+
+## Load PHL geo layer
+
+```{r load_geo_layer}
+
+# Read the shapefile
+shpToRead <- paste(home, boundarySourceFolder, geoLayerName,".shp", sep="")
+
+geoLayer = st_read(shpToRead)
+
+# Keep only the columns of relevance
+geoLayer <- geoLayer[c("GEOID", "ALAND", "geometry")]
+
+#str(geoLayer)
+geoLayer
+str(geoLayer)
+
+# Plot it
+plot(st_geometry(geoLayer), col = sf.colors(12, categorical = TRUE), border = 'grey', axes = TRUE)
+```
+
+## Merge geolayer and table data
+
+```{r merge_geo_and_data}
+
+geoLayerWithData <- merge(geoLayer, acsData, by.x="GEOID", by.y="GEO.id2")
+
+# Sort by descending order / check for NA values etc. (just to review the data)
+#geoLayerWithData[order(-acsData$ZeroVehicule_Pct),] 
+#subset(geoLayerWithData,geoLayerWithData$GEOID10=="421019804001") 
+
+geoLayerWithData 
+
+```
+
+## Plot map
+
+For testing purposes.
+
+```{r plot_map,  include=FALSE}
+
+ditch_the_axes <- theme(
+  axis.text = element_blank(),
+  axis.line = element_blank(),
+  axis.ticks = element_blank(),
+  panel.border = element_blank(),
+  panel.grid = element_blank(),
+  axis.title = element_blank()
+  )
+
+#ggplot() + geom_sf(data = geoLayerWithData,  aes(fill = ZeroVehicule_Pct)) + theme_bw() + #ditch_the_axes + scale_fill_gradient(low="#ccccff", high="#0000e6")
+
+```
+
+
+## Export to Shp
+
+```{r export_to_shp}
+
+shpToWrite <- paste(home, outFolder,  outputLayerName, ".shp", sep="")
+shpToWrite
+st_write(geoLayerWithData, shpToWrite, delete_layer=TRUE)
+
+```
+
