@@ -72,12 +72,12 @@ ctppData3$MeansOfT_Category <- sub("Estimate; Total: - \\S*: - ", "", ctppData3$
 ctppData3$MeansOfT_Category <- sub("Estimate; Total: - ", "", ctppData3$MeansOfT_Category)
 ctppData3$MeansOfT_Category <- sub("Estimate; Total:", "Total:", ctppData3$MeansOfT_Category)
 
-# Create new column Who
-ctppData3$Who <- ctppData3$Pretty_Name
-ctppData3$Who <- sub("Estimate; Total: - (\\S*):.*$", "\\1", ctppData3$Who)
-ctppData3$Who <- sub("^.*(Total).*$", "\\1", ctppData3$Who)
+# Create new column Gender
+ctppData3$Gender <- ctppData3$Pretty_Name
+ctppData3$Gender <- sub("Estimate; Total: - (\\S*):.*$", "\\1", ctppData3$Gender)
+ctppData3$Gender <- sub("^.*(Total).*$", "\\1", ctppData3$Gender)
 
-ctppData <- ctppData3[c("Who","MeansOfT_Category", "Num_of_People")] 
+ctppData <- ctppData3[c("Gender","MeansOfT_Category", "Num_of_People")] 
 ctppData
 
 ```
@@ -97,17 +97,17 @@ ctppData
 ```{r one_column_per_bracket}
 
 # Create a dataframe seed with just a MeansOfT_Category column
-merged_df <- ctppData[ctppData$Income_bracket == "Total, household income",]
+merged_df <- ctppData[ctppData$Gender == "Total",]
 merged_df <- merged_df[2] 
 
 # Get the list of all unique income brackets in the original data
-income_category  <- unique(ctppData$Income_bracket)
+Gender_List  <- unique(ctppData$Gender)
 
-# Loop through the list of income brackets to get the number of people values for each bracket in each MeansOfT category
+# Loop through the list of Genders to get the number of people values for each Gender in each MeansOfT category
 # and add them as a new column to the new dataframe  
-for(i in income_category){
-  ctppDataTemp <- ctppData[ctppData$Income_bracket == i,]
-  colnames(ctppDataTemp)[colnames(ctppDataTemp)=="Num_Of_People"] <- i
+for(i in Gender_List){
+  ctppDataTemp <- ctppData[ctppData$Gender == i,]
+  colnames(ctppDataTemp)[colnames(ctppDataTemp)=="Num_of_People"] <- i
   ctppDataTemp <- ctppDataTemp[c(2,3)]
   merged_df <- merge(merged_df, ctppDataTemp, by="MeansOfT_Category")
 }
