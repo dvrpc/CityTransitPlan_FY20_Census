@@ -7,9 +7,9 @@ title: "Gender_by_MeansOfT_PHL"
 * Process the data downloaded from the Census fact finder: Gender by Means Transportation for Philadelphia County as a residence (B08006, ACS 2016 5 years). 
 * Input: Single CSV file representing the means of transportation breakdown by gender (4 rows and 573 columns).  
 
-* Output: Produces an Excel file where the data has been restructured and aggregated (8 columns and 6 rows). It is ready to generate pie or bar charts.
+* Output: Produces an Excel file where the data has been restructured and aggregated (5 columns and 51 rows). The rest of the data formatting was done by hand.
 
-* Last modified: 11/05/2019
+* Last modified: 11/07/2019
 
 # Init
 
@@ -25,7 +25,7 @@ library(ggplot2)
 
 home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data3rdPass/"
 
-tableName <- "GenderByModeOfT_PHL"
+tableName <- "GenderByModeOfT_PHL/ACS_16_5YR_B08006"
 
 tableSourceFolder <- "GisReadyTables/"
 outFolder <- "DisplayReadyData/"
@@ -37,7 +37,7 @@ outFolder <- "DisplayReadyData/"
 ```{r read_csv}
 
 # Read the file
-fileToRead <- paste(home, "RawData/RawXls/", tableName, ".csv", sep="")
+fileToRead <- paste(home, "RawData/RawXls/", tableName, "_with_ann.csv", sep="")
 fileToRead
 ctppData <- read.csv(file=fileToRead, header=FALSE, sep="," ,skip=0)
 
@@ -49,9 +49,6 @@ colnames(ctppData2) <- c("ID", "Pretty_Name", "Num_of_People")
 
 # Remove the first 3 rows, which contain geography IDs
 ctppData2 <- ctppData2[ -c(1, 2, 3), ]
-
-## Remove the Residence column, which is empty
-#ctppData3 <- ctppData2[c(1,2,3,5)]
 
 ctppData <- ctppData2
 
@@ -68,7 +65,8 @@ ctppData3 <- subset(ctppData, grepl("Estimate", Pretty_Name),)
 
 # Create new column MeansOfT_Category
 ctppData3$MeansOfT_Category <- ctppData3$Pretty_Name
-ctppData3$MeansOfT_Category <- sub("Estimate; Total: - \\S*: - ", "", ctppData3$MeansOfT_Category)
+ctppData3$MeansOfT_Category <- sub("Estimate; Total: - \\S*: - ", "", 
+                                   ctppData3$MeansOfT_Category)
 ctppData3$MeansOfT_Category <- sub("Estimate; Total: - ", "", ctppData3$MeansOfT_Category)
 ctppData3$MeansOfT_Category <- sub("Estimate; Total:", "Total:", ctppData3$MeansOfT_Category)
 
@@ -94,7 +92,9 @@ ctppData
 
 ## Generate a dataframe with one column per income bracket
 
-```{r one_column_per_bracket}
+[NOT USED - It was simpler to do the rest manually in a spreadsheet, and gave more fine-grained control on the data.]
+
+```{r one_column_per_bracket eval=FALSE}
 
 # Create a dataframe seed with just a MeansOfT_Category column
 merged_df <- ctppData[ctppData$Gender == "Total",]
@@ -118,7 +118,9 @@ merged_df
 
 ## Transpose rows into columns again
 
-```{r transpose_again}
+[NOT USED]
+
+```{r transpose_again eval=FALSE}
 
 # Transpose rows into columns to get a dataframe of 11 columns and 27 rows 
 ctppDataAggreg <- data.frame(t(merged_df[-1]))
@@ -129,25 +131,15 @@ ctppDataAggreg
 
 ## Aggregate some of the means of transportation columns
 
-``` {r aggregate_cols}
+[NOT USED]
 
-# Sum up the 3 car-related categories into "Auto"
-ctppDataAggreg["Auto"] <-rowSums(ctppDataAggreg[,c("Car, truck, or van -- Drove alone", "Car, truck, or van -- In a 2-person carpool", "Car, truck, or van -- In a 3-or-more person carpool")])
+``` {r aggregate_cols eval=FALSE}
 
-# Sum up all public transit into "Transit"
-ctppDataAggreg["Transit"] <-rowSums(ctppDataAggreg[,c("Bus or trolley bus", "Railroad or ferryboat",	"Streetcar, trolley car, subway, or elevated")])
+# This is not implemented, since I did it manually, but as an example:
 
 # Sum up Bicycle and Walked into "Active"
 ctppDataAggreg["Active"] <-rowSums(ctppDataAggreg[,c("Bicycle", "Walked")])
 
-# Sum up all others into "Other"
-ctppDataAggreg["Other"] <-rowSums(ctppDataAggreg[,c("Taxicab, motorcycle or other method", "Worked at home")])
-
-# Remove detail columns
-ctppDataAggreg <- ctppDataAggreg[c("Bus or trolley bus", "Railroad or ferryboat", "Streetcar, trolley car, subway, or elevated",  "Auto", "Transit", "Active", "Other", "Total, means of transportation")]
-
-colnames(ctppDataAggreg) <- c("Bus or trolley", "Railroad", "Subway",  "Auto", "Transit", "Active", "Other", "Total")
-  
 ctppDataAggreg
 
 ```
@@ -156,7 +148,7 @@ ctppDataAggreg
 
 ```{r export_to_excel}
 
-fileToWrite <- paste(home, outFolder, tableName, "PREPPED.xlsx", sep="")
+fileToWrite <- paste(home, outFolder, tableName, "_PREPPED.xlsx", sep="")
 write_xlsx(x = ctppDataAggreg, path = fileToWrite, col_names = TRUE)
 
 ```
