@@ -6,11 +6,11 @@ title: "VehiclePopRatio_10Counties"
 
 * This script processes a dataset that was extracted from the Census FactFinder at the Census block group level. 
 
-* The goal is to generate a map showing the percentage of the population in Philadelphia plus 9 surrounding counties that lacks access to a vehicle.
+* The goal is to generate a map showing the percentage of the population  that lacks access to a vehicle. The extent is Philadelphia plus 9 surrounding counties.
 
 * Output: Produces a feature class at the block group level, exported as a Shp.
 
-* Last modified: 11/06/2019
+* Last modified: 11/07/2019
 
 * For more documentation, see https://docs.google.com/document/d/121wuW2rLnx1hJ-_4_Ew7crX0tLyWc8PaEUwvSNwggeU/edit?usp=sharing
 
@@ -23,6 +23,7 @@ Initialize the paths and names.
 
 library(sf)
 library(ggplot2)
+library(writexl)
 
 # Paths
 home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data3rdPass/"
@@ -64,7 +65,10 @@ colnames(acsData)[colnames(acsData)=="HD01_VD01"] <- "Total_OHU"
 acsData <- subset(acsData, acsData$Total_OHU > 0 ) 
 
 # Keep only the columns of relevance and reorder the columns
- acsData <- acsData[c("GEO.id2","Total_ZeroVehicule", "Total_OHU",  "ZeroVehicule_Pct")]
+acsData <- acsData[c("GEO.id2","Total_ZeroVehicule", "Total_OHU",  "ZeroVehicule_Pct")]
+
+# Choose short column names for shapefile exports
+names(acsData) <- c("GEO.id2","0Vehicle", "TotalOHU",  "0VehPct")
 
 # Sort by descending order (just to review the data)
 #acsData[order(acsData$Total_OHU),]
@@ -75,8 +79,16 @@ acsData
 
 ```
 
+## Export to Excel (Just to do some manual data checks, if desired)
 
-## Load PHL geo layer
+```{r export_to_excel}
+
+fileToWrite <- paste(home, outFolder,outputLayerName, ".xlsx", sep="")
+#write_xlsx(x = acsData, path = fileToWrite, col_names = TRUE)
+
+```
+
+## Load PHL geo layer (block group boundaries)
 
 ```{r load_geo_layer}
 
@@ -86,7 +98,7 @@ shpToRead <- paste(home, boundarySourceFolder, geoLayerName,".shp", sep="")
 geoLayer = st_read(shpToRead)
 
 # Keep only the columns of relevance
-geoLayer <- geoLayer[c("GEOID", "ALAND", "geometry")]
+geoLayer <- geoLayer[c("GEOID", "geometry")]
 
 #str(geoLayer)
 geoLayer
@@ -104,7 +116,7 @@ geoLayerWithData <- merge(geoLayer, acsData, by.x="GEOID", by.y="GEO.id2")
 
 # Sort by descending order / check for NA values etc. (just to review the data)
 #geoLayerWithData[order(-acsData$ZeroVehicule_Pct),] 
-#subset(geoLayerWithData,geoLayerWithData$GEOID10=="421019804001") 
+#subset(geoLayerWithData,geoLayerWithData$GEOID=="421019804001") 
 
 geoLayerWithData 
 

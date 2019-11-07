@@ -6,11 +6,11 @@ title: "VulnerablePop_10Counties"
 
 * This script processes several datasets that were extracted from the Census FactFinder at the Census block group level. 
 
-* The goal is to generate a map of vulnerable populations in Philadelphia plus 9 surrounding counties that are unlikely to own a car. 
+* The goal is to generate a map of vulnerable populations that are unlikely to own a car. The extent is Philadelphia plus 9 surrounding counties.
 
 * Output: Produces a feature classes at the block group level, exported as a Shp.
 
-* Last modified: 11/06/2019
+* Last modified: 11/07/2019
 
 * For more documentation, see: https://docs.google.com/document/d/15k84IpB26IW4qqVZCuR_g4R6JqTjTDz7RJd8_9FROGg/edit?usp=sharing
 
@@ -23,6 +23,7 @@ Initialize the paths and names.
 
 library(sf)
 library(ggplot2)
+library(writexl)
 
 
 # Paths
@@ -168,13 +169,29 @@ acsData["Vulner_Indx"]<- round((acsData$Vulnerability_Sum / 3) * 100, digits = 2
 #acsData[order(-acsData$Elderly_Pct),] 
 
 # Reorder the columns (and drop useless ones)
-acsData <- acsData[c(1, 8, 2, 4, 5, 3, 6)]
+#acsData <- acsData[c(1, 8, 2, 4, 5, 3, 6)]
+
+
+# Choose short column names for shapefile exports
+### names(acsData) <- c("GEO.id2","0Vehicle", "TotalOHU",  "0VehPct")
+
 acsData
 
 
 ```
 
-## Load PHL geo layer
+
+## Export to Excel (Just to do some manual data checks, if desired)
+
+```{r export_to_excel}
+
+fileToWrite <- paste(home, outFolder,outputLayerName, ".xlsx", sep="")
+write_xlsx(x = acsData, path = fileToWrite, col_names = TRUE)
+
+```
+
+
+## Load PHL geo layer (block group boundaries)
 
 ```{r load_geo_layer}
 
@@ -184,7 +201,7 @@ shpToRead <- paste(home, boundarySourceFolder, geoLayerName,".shp", sep="")
 geoLayer = st_read(shpToRead)
 
 # Keep only the columns of relevance
-geoLayer <- geoLayer[c("GEOID", "ALAND", "geometry")]
+geoLayer <- geoLayer[c("GEOID", "geometry")]
 
 #str(geoLayer)
 geoLayer
@@ -225,7 +242,7 @@ ditch_the_axes <- theme(
   axis.title = element_blank()
   )
 
-ggplot() + geom_sf(data = geoLayerWithData,  aes(fill = Vulner_Indx)) + theme_bw() + ditch_the_axes + scale_fill_gradient(low="#ccccff", high="#0000e6")
+#ggplot() + geom_sf(data = geoLayerWithData,  aes(fill = Vulner_Indx)) + theme_bw() + ditch_the_axes #+ scale_fill_gradient(low="#ccccff", high="#0000e6")
 
 ```
 
@@ -234,9 +251,10 @@ ggplot() + geom_sf(data = geoLayerWithData,  aes(fill = Vulner_Indx)) + theme_bw
 
 ```{r export_to_shp}
 
-shpToWrite <- paste(home, outFolder,  outputLayerName, ".shp", sep="")
+shpToWrite <- paste(home, outFolder,  outputLayerName, "2.shp", sep="")
 shpToWrite
 st_write(geoLayerWithData, shpToWrite, delete_layer=TRUE)
 
 ```
+
 
