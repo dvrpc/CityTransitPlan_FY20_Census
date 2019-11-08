@@ -5,7 +5,7 @@ title: "Gender_by_MeansOfT_PHL"
 # Summary
 
 * Process the data downloaded from the Census fact finder: Gender by Means Transportation for Philadelphia County as a residence (B08006, ACS 2016 5 years). 
-* Input: Single CSV file representing the means of transportation breakdown by gender (4 rows and 573 columns).  
+* Input: Single CSV file representing the means of transportation breakdown by gender (3 rows and 105 columns).  
 
 * Output: Produces an Excel file where the data has been restructured and aggregated (5 columns and 51 rows). The rest of the data formatting was done by hand.
 
@@ -90,7 +90,7 @@ ctppData$Num_of_People <- as.numeric(ctppData$Num_of_People)
 ctppData
 ```
 
-## Generate a dataframe with one column per income bracket
+## Generate a dataframe with one column per Gender
 
 [NOT USED - It was simpler to do the rest manually in a spreadsheet, and gave more fine-grained control on the data.]
 
