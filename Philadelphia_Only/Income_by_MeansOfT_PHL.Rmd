@@ -8,9 +8,9 @@ title: "Income_by_MeansOfT_PHL"
 
 * Input: Single CSV file extracted from the CTPP site representing the means of transportation breakdown for 25 different income brackets (4 rows and 573 columns).  
 
-* Output: Produces an Excel file where the data has been restructured and aggregated (8 columns and 6 rows). It is ready to generate pie or bar charts.
+* Output: Produces an Excel file where the data has been restructured and aggregated (5 columns and 8 rows). It is ready to generate bar charts.
 
-* Last modified: 11/05/2019
+* Last modified: 11/07/2019
 
 # Init
 
@@ -26,7 +26,7 @@ library(ggplot2)
 
 home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data3rdPass/"
 
-tableName <- "IncomeByModeOfT_PHL"
+tableName <- "IncomeByModeOfT_PHL/B103203_ModesOfT_byIncome_PHL"
 
 tableSourceFolder <- "GisReadyTables/"
 outFolder <- "DisplayReadyData/"
@@ -99,6 +99,7 @@ merged_df <- merged_df[2]
 
 # Get the list of all unique income brackets in the original data
 income_category  <- unique(ctppData$Income_bracket)
+income_category
 
 # Loop through the list of income brackets to get the number of people values for each bracket in each MeansOfT category
 # and add them as a new column to the new dataframe  
@@ -140,7 +141,7 @@ ctppDataAggreg["Active"] <-rowSums(ctppDataAggreg[,c("Bicycle", "Walked")])
 # Sum up all others into "Other"
 ctppDataAggreg["Other"] <-rowSums(ctppDataAggreg[,c("Taxicab, motorcycle or other method", "Worked at home")])
 
-# Remove detail columns
+# Reorder columns and remove superfluous ones
 ctppDataAggreg <- ctppDataAggreg[c("Bus or trolley bus", "Railroad or ferryboat", "Streetcar, trolley car, subway, or elevated",  "Auto", "Transit", "Active", "Other", "Total, means of transportation")]
 
 colnames(ctppDataAggreg) <- c("Bus or trolley", "Railroad", "Subway",  "Auto", "Transit", "Active", "Other", "Total")
@@ -153,15 +154,20 @@ ctppDataAggreg
 ```{r quintiles}
 # Separate the rows in 5 quintiles (based on a model provided separately),
 # sum up each column, and put everything in a new dataframe
-quintiles <- as.data.frame(rbind(colSums(ctppDataAggreg[2:13,]),
-                   colSums(ctppDataAggreg[14:21,]),
-                   colSums(ctppDataAggreg[22:23,]),
-                   colSums(ctppDataAggreg[24,]),
-                   colSums(ctppDataAggreg[25:26,])))
+quintiles <- as.data.frame(rbind(
+                   colSums(ctppDataAggreg[2:13,]),  # $0-$34,999	
+                   colSums(ctppDataAggreg[14:21,]), # $35,000-$59,999
+                   colSums(ctppDataAggreg[22:23,]), # $60,000-$99,999	 	 
+                   colSums(ctppDataAggreg[24,]),    # $100,000-$124,999	
+                   colSums(ctppDataAggreg[25:26,])))# $125,000 or more
 
+
+#Add row names using numbers from 1 to 5, corresponding to quintiles 1 to 5:
 row.names(quintiles)<- seq.int(nrow(quintiles))
 
+# Add these numbers as a separate explicit column.
 quintiles$Quintile_Num <- seq.int(nrow(quintiles))
+
 
 quintiles
 
@@ -173,8 +179,9 @@ quintiles
 
 ```{r export_to_excel}
 
-fileToWrite <- paste(home, outFolder, tableName, "PREPPED.xlsx", sep="")
-write_xlsx(x = ctppDataAggreg, path = fileToWrite, col_names = TRUE)
+fileToWrite <- paste(home, outFolder, "IncomeByModeOfT_PHL_PREPPED.xlsx", sep="")
+fileToWrite
+write_xlsx(x = quintiles, path = fileToWrite, col_names = TRUE)
 
 ```
 
