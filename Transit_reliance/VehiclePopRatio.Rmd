@@ -24,7 +24,8 @@ Initialize the paths and names.
 library(sf)
 library(ggplot2)
 
-home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine/TransitReliance/Data/"
+home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/TransitReliance/Data/1st_Pass_PHL_Only/"
+
 
 tableSourceFolder <- "OrigData/"
 boundarySourceFolder <- "RelevantBoundaries/"
@@ -46,8 +47,8 @@ acsData <- acsData[-1, ]
 # Keep only the columns of relevance and rename field
 acsData <- acsData[c("GEO.id2", "HD01_VD01", "HD01_VD03", "HD01_VD10")]
 
-# Convert them to the right format (from the original "factor" type)
-acsData[,2:4] <- sapply(acsData[,2:4], as.character)
+# Convert them to the right format (character and numeric from the original "factor" type)
+acsData[,1:4] <- sapply(acsData[,1:4], as.character)
 acsData[,2:4] <- sapply(acsData[,2:4], as.numeric)
 
 # Add all occupied housing units (OHU) with 0 vehicles available, and divide by the total number of OHU

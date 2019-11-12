@@ -26,13 +26,13 @@ library(ggplot2)
 library(writexl)
 
 # Paths
-home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/CtppAnalysis/Data3rdPass/"
-tableSourceFolder <- "RawData/RawXls/VehiclesAvailable_10Counties/"
+home <- "U:/FY2020/Transportation/TransitBikePed/CityTransitPlan/Delphine_CityTransitPlan/TransitReliance/Data/2nd_Pass_10Counties/"
+tableSourceFolder <- "RawData/RawXls/"
 boundarySourceFolder <- "RelevantBoundaries/"
 outFolder <- "DisplayReadyData/Shp/"
 
 # Dataset names
-origSet <- "ACS_17_5YR_B25044"  #  Tenure by Vehicles Available
+origSet <- "VehiclesAvailable_10Counties/ACS_17_5YR_B25044"  #  Tenure by Vehicles Available
 geoLayerName <- "10Counties_Blockgroups_Proj"
 outputLayerName <- "ZeroVehicleRatio"
 ```
@@ -51,8 +51,8 @@ acsData <- acsData[-1, ]
 # Renter with 0 vehicles)
 acsData <- acsData[c("GEO.id2", "HD01_VD01", "HD01_VD03", "HD01_VD10")]
 
-# Convert them to the right format (from the original "factor" type)
-acsData[,2:4] <- sapply(acsData[,2:4], as.character)
+# Convert them to the right format (character and numeric from the original "factor" type)
+acsData[,1:4] <- sapply(acsData[,1:4], as.character)
 acsData[,2:4] <- sapply(acsData[,2:4], as.numeric)
 
 # Add all OHU with 0 vehicles available (owner + renter), and divide by the total number of OHU
