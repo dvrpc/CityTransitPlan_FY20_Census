@@ -84,7 +84,7 @@ ctppData
 
 ``` {r text_to_numeric}
 
-ctppData$Num_Of_People <- as.numeric(gsub(",", "", ctppData$Num_Of_People))
+ctppData$Num_Of_People <- as.numeric(as.character(gsub(",", "", ctppData$Num_Of_People)))
 
 ctppData
 ```
