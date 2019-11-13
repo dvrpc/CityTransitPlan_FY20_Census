@@ -42,17 +42,17 @@ fileToRead
 ctppData <- read.csv(file=fileToRead, header=FALSE, sep="," ,skip=0)
 
 # Transpose rows into columns to get a dataframe of 4 columns and 573 rows
-ctppData2 <- data.frame(t(ctppData))
+ctppData <- data.frame(t(ctppData))
 
 # Rename the columns
-colnames(ctppData2) <- c("ID", "Pretty_Name", "Num_of_People")
+colnames(ctppData) <- c("ID", "Pretty_Name", "Num_of_People")
 
 # Remove the first 3 rows, which contain geography IDs
-ctppData2 <- ctppData2[ -c(1, 2, 3), ]
+ctppData <- ctppData[ -c(1, 2, 3), ]
 
-ctppData <- ctppData2
+#ctppData <- ctppData2
 
-ctppData
+#ctppData
 
 ```
 
@@ -61,21 +61,22 @@ ctppData
 ```{r cleanup_ids}
 
 # Keep only the rows containing Estimates (drop the Margin of Error rows)
-ctppData3 <- subset(ctppData, grepl("Estimate", Pretty_Name),)
-
-# Create new column MeansOfT_Category
-ctppData3$MeansOfT_Category <- ctppData3$Pretty_Name
-ctppData3$MeansOfT_Category <- sub("Estimate; Total: - \\S*: - ", "", 
-                                   ctppData3$MeansOfT_Category)
-ctppData3$MeansOfT_Category <- sub("Estimate; Total: - ", "", ctppData3$MeansOfT_Category)
-ctppData3$MeansOfT_Category <- sub("Estimate; Total:", "Total:", ctppData3$MeansOfT_Category)
+ctppData <- subset(ctppData, grepl("Estimate", Pretty_Name),)
 
 # Create new column Gender
-ctppData3$Gender <- ctppData3$Pretty_Name
-ctppData3$Gender <- sub("Estimate; Total: - (\\S*):.*$", "\\1", ctppData3$Gender)
-ctppData3$Gender <- sub("^.*(Total).*$", "\\1", ctppData3$Gender)
+ctppData$Gender <- ctppData$Pretty_Name
+ctppData$Gender <- sub("^.*Female:.*$", "Female", ctppData$Gender)
+ctppData$Gender <- sub("^.*Male:.*$", "Male", ctppData$Gender)
+ctppData$Gender <- sub("^.*Total:.*$", "Total", ctppData$Gender)
 
-ctppData <- ctppData3[c("Gender","MeansOfT_Category", "Num_of_People")] 
+# Create new column MeansOfT_Category
+ctppData$MeansOfT_Category <- ctppData$Pretty_Name
+ctppData$MeansOfT_Category <- sub("Estimate; Total: - \\S*: - ", "", 
+                                   ctppData$MeansOfT_Category)
+ctppData$MeansOfT_Category <- sub("Estimate; Total: - ", "", ctppData$MeansOfT_Category)
+ctppData$MeansOfT_Category <- sub("Estimate; Total:", "Total:", ctppData$MeansOfT_Category)
+
+ctppData <- ctppData[c("Gender","MeansOfT_Category", "Num_of_People")] 
 ctppData
 
 ```
@@ -85,6 +86,7 @@ ctppData
 
 ``` {r text_to_numeric}
 
+ctppData$Num_of_People <- as.character(ctppData$Num_of_People)
 ctppData$Num_of_People <- as.numeric(ctppData$Num_of_People)
 
 ctppData
