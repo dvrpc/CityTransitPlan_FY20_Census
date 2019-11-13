@@ -156,6 +156,8 @@ acsData <- subset(acsData,acsData$Total_Pop > 0 & acsData$Total_HH >0)
 
 # Just to check: compute the average number of people by household
 acsData["peopleByHH"]<- acsData$Total_Pop / acsData$Total_HH 
+# Note a very high ratio should correspond to a block group with college dorms, 
+# retirement home, or jail.
 
 acsData
 
@@ -181,7 +183,7 @@ acsData["Vulner_Indx"]<- round((acsData$Vulnerability_Sum / 3) * 100, digits = 2
 acsData <- acsData[c("GEO.id2", "Vulner_Indx", "Disabil_Pct", "Poverty_Pct", "Elderly_Pct")]
 
 # Choose short column names for shapefile exports
-names(acsData) <- c("GEO.id2", "Vulner_Indx", "Disabil_Pct", "Poverty_Pct", "Elderly_Pct")
+names(acsData) <- c("GEO.id2", "VulneIdx", "Disabil%", "Poverty%", "Elderly%")
 
 acsData
 
@@ -191,7 +193,7 @@ acsData
 
 ## Export to Excel (Just to do some manual data checks, if desired)
 
-```{r export_to_excel}
+```{r export_to_excel eval=FALSE}
 
 fileToWrite <- paste(home, outFolder,outputLayerName, ".xlsx", sep="")
 write_xlsx(x = acsData, path = fileToWrite, col_names = TRUE)
@@ -260,7 +262,7 @@ ditch_the_axes <- theme(
 
 ```{r export_to_shp}
 
-shpToWrite <- paste(home, outFolder,  outputLayerName, "3.shp", sep="")
+shpToWrite <- paste(home, outFolder,  outputLayerName, ".shp", sep="")
 shpToWrite
 st_write(geoLayerWithData, shpToWrite, delete_layer=TRUE)
 
