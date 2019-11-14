@@ -44,12 +44,17 @@ outputLayerName <- "ZeroVehicleRatio"
 fileToRead <- paste(home, tableSourceFolder, origSet, "_with_ann.csv", sep="")
 fileToRead
 acsData <- read.csv(file=fileToRead, header=TRUE, sep=",")
-acsData <- acsData[-1, ]
+
+# Get rid of all Estimate columns
+acsData <- acsData[ , grepl("HD01_VD|GEO" , names(acsData)) ]
 
 # Keep only the columns of relevance and rename field: 
 # GeoID, total number of occupied housing units (OHU), Owner with 0 vehicles,
 # Renter with 0 vehicles)
 acsData <- acsData[c("GEO.id2", "HD01_VD01", "HD01_VD03", "HD01_VD10")]
+
+# Remove description row
+acsData <- acsData[-1, ]
 
 # Convert them to the right format (character and numeric from the original "factor" type)
 acsData[,1:4] <- sapply(acsData[,1:4], as.character)
@@ -57,6 +62,8 @@ acsData[,2:4] <- sapply(acsData[,2:4], as.numeric)
 
 # Add all OHU with 0 vehicles available (owner + renter), and divide by the total number of OHU
 acsData["Total_ZeroVehicule"] <- (acsData$HD01_VD03 + acsData$HD01_VD10) 
+acsData["ZeroVehicule_ratio"] <- acsData$Total_ZeroVehicule / acsData$HD01_VD01
+
 acsData["ZeroVehicule_Pct"] <- round((acsData$Total_ZeroVehicule / acsData$HD01_VD01) * 100, digits = 2)
   
 colnames(acsData)[colnames(acsData)=="HD01_VD01"] <- "Total_OHU"
@@ -68,11 +75,12 @@ acsData <- subset(acsData, acsData$Total_OHU > 0 )
 acsData <- acsData[c("GEO.id2","Total_ZeroVehicule", "Total_OHU",  "ZeroVehicule_Pct")]
 
 # Choose short column names for shapefile exports
-names(acsData) <- c("GEO.id2","0Vehicle", "TotalOHU",  "0VehPct")
+names(acsData) <- c("GEO.id2","0Vehicle", "TotalOHU",  "OVehPct")
 
 # Sort by descending order (just to review the data)
-#acsData[order(acsData$Total_OHU),]
-#acsData[order(-acsData$ZeroVehicule_Pct),]
+#acsData <- acsData[order(acsData$TotalOHU),]
+#acsData <- acsData[order(-acsData$OVehPct),]
+#acsData <- acsData[order(acsData$GEO.id2),]
 
 acsData
 
@@ -81,7 +89,7 @@ acsData
 
 ## Export to Excel (Just to do some manual data checks, if desired)
 
-```{r export_to_excel}
+```{r export_to_excel  eval=FALSE}
 
 fileToWrite <- paste(home, outFolder,outputLayerName, ".xlsx", sep="")
 #write_xlsx(x = acsData, path = fileToWrite, col_names = TRUE)
@@ -115,7 +123,7 @@ plot(st_geometry(geoLayer), col = sf.colors(12, categorical = TRUE), border = 'g
 geoLayerWithData <- merge(geoLayer, acsData, by.x="GEOID", by.y="GEO.id2")
 
 # Sort by descending order / check for NA values etc. (just to review the data)
-#geoLayerWithData[order(-acsData$ZeroVehicule_Pct),] 
+#geoLayerWithData[order(-acsData$OVehPct),] 
 #subset(geoLayerWithData,geoLayerWithData$GEOID=="421019804001") 
 
 geoLayerWithData 
@@ -137,7 +145,7 @@ ditch_the_axes <- theme(
   axis.title = element_blank()
   )
 
-#ggplot() + geom_sf(data = geoLayerWithData,  aes(fill = ZeroVehicule_Pct)) + theme_bw() + #ditch_the_axes + scale_fill_gradient(low="#ccccff", high="#0000e6")
+ggplot() + geom_sf(data = geoLayerWithData,  aes(fill = OVehPct)) + theme_bw() + ditch_the_axes + scale_fill_gradient(low="#ccccff", high="#0000e6")
 
 ```
 
@@ -146,7 +154,7 @@ ditch_the_axes <- theme(
 
 ```{r export_to_shp}
 
-shpToWrite <- paste(home, outFolder,  outputLayerName, ".shp", sep="")
+shpToWrite <- paste(home, outFolder,  outputLayerName, "1.shp", sep="")
 shpToWrite
 st_write(geoLayerWithData, shpToWrite, delete_layer=TRUE)
 
