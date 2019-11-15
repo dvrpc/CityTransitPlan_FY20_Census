@@ -75,8 +75,14 @@ ctppData$MeansOfT_Category <- sub("Estimate; Total: - \\S*: - ", "",
                                    ctppData$MeansOfT_Category)
 ctppData$MeansOfT_Category <- sub("Estimate; Total: - ", "", ctppData$MeansOfT_Category)
 ctppData$MeansOfT_Category <- sub("Estimate; Total:", "Total:", ctppData$MeansOfT_Category)
+ctppData$MeansOfT_Category <- sub(":$", "", ctppData$MeansOfT_Category)
+
+# Handle the special case of Male and Female total rows
+ctppData$MeansOfT_Category[ctppData$MeansOfT_Category == "Male"] <- "Total"
+ctppData$MeansOfT_Category[ctppData$MeansOfT_Category == "Female"] <- "Total"
 
 ctppData <- ctppData[c("Gender","MeansOfT_Category", "Num_of_People")] 
+
 ctppData
 
 ```
@@ -94,9 +100,7 @@ ctppData
 
 ## Generate a dataframe with one column per Gender
 
-[NOT USED - It was simpler to do the rest manually in a spreadsheet, and gave more fine-grained control on the data.]
-
-```{r one_column_per_bracket eval=FALSE}
+```{r one_column_per_bracket}
 
 # Create a dataframe seed with just a MeansOfT_Category column
 merged_df <- ctppData[ctppData$Gender == "Total",]
@@ -114,6 +118,9 @@ for(i in Gender_List){
   merged_df <- merge(merged_df, ctppDataTemp, by="MeansOfT_Category")
 }
 
+# Sum up Male and Female (just to check)
+merged_df$Sum_to_check = merged_df$Male + merged_df$Female
+
 merged_df
 
 ```
@@ -122,7 +129,7 @@ merged_df
 
 [NOT USED]
 
-```{r transpose_again eval=FALSE}
+```{r transpose_again}
 
 # Transpose rows into columns to get a dataframe of 11 columns and 27 rows 
 ctppDataAggreg <- data.frame(t(merged_df[-1]))
@@ -137,7 +144,7 @@ ctppDataAggreg
 
 ``` {r aggregate_cols eval=FALSE}
 
-# This is not implemented, since I did it manually, but as an example:
+# This is not implemented, as it was simpler to do it in the spreadsheet, but as an example:
 
 # Sum up Bicycle and Walked into "Active"
 ctppDataAggreg["Active"] <-rowSums(ctppDataAggreg[,c("Bicycle", "Walked")])
